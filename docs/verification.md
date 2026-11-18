@@ -7,7 +7,7 @@ Les contrôles sont locaux, sur Windows avec SDK .NET 10.0.401. Aucun accès au 
 - Compilation Release : réussie sans avertissement ni erreur.
 - Migrations : aucun changement de modèle non migré ; SQL PostgreSQL généré dans `docs/schema-postgresql.sql`.
 - Dépendances : aucun package NuGet vulnérable signalé, transitifs inclus ; `npm audit` ne signale aucune vulnérabilité. L’image Docker finale reste à scanner.
-- Tests xUnit : domaine, HTTP réel dans TestServer, base SQLite relationnelle, Identity, contraintes uniques, isolation des foyers et PDF analysés avec PdfPig. Dernier passage : 19 tests réussis, aucun échec.
+- Tests xUnit : domaine, HTTP réel dans TestServer, base SQLite relationnelle, Identity, contraintes uniques, isolation des foyers et PDF analysés avec PdfPig. Dernier passage : 63 tests réussis, aucun échec.
 - Deux utilisateurs d’un foyer voient la même révision de semaine ; un autre foyer voit une autre semaine et reçoit 404 pour les PDF du premier foyer.
 - Redirection des anonymes, refus des actions administratives aux membres, POST sans antiforgery refusé, conflit de modification en 409.
 - Réimport idempotent et conservation des enrichissements, panne simulée sans perte de catalogue.
@@ -70,3 +70,33 @@ Tests ajoutés : API volontairement bloquée alors que le POST répond déjà, a
 Vérification Chromium locale avec API simulée : lancement, suivi JavaScript/JSON, affichage du bilan, réactivation du bouton et rechargement explicite du catalogue ; écrans d’administration contrôlés à 390 et 1440 px. Captures `qa/bookstack-sync-390.png` et `qa/bookstack-sync-1440.png`. Le reverse proxy du VPS et l’instance réelle restent à vérifier sur place.
 
 Limite documentée : file et suivi en mémoire, adaptés au conteneur unique de Compose. Un arrêt du conteneur impose de relancer explicitement une tâche interrompue. Aucun changement de schéma ni migration supplémentaire pour cette correction.
+
+
+## Extraction structurée du carnet BookStack
+
+Le texte intégral de la poêlée provençale fourni dans la conversation est conservé comme fixture de test. Résultat vérifié : 11 lignes, 4 portions, poulet 600 g, eau 120 ml, temps actif 20 min, total 45 min, kcal estimées 610, repère source de réfrigération 48 h, instructions de service et huit étapes distinctes. Les ingrédients évoqués seulement dans les substitutions et les saveurs ne sont pas ajoutés au tableau. Le temps de cuisson global, la durée de congélation et les consignes de décongélation manquantes restent inconnus. Les réserves sur les allergènes et le caractère non testé de la source restent visibles dans la revue ; aucune fiche n’est validée ou publiée automatiquement.
+
+Contrôles supplémentaires : conversion HTML conservant tables et listes, branche API HTML sans Markdown, décimales et fractions, quantités ambiguës, portions contradictoires, classement explicite des catégories, conservation des valeurs locales et de leurs effacements, provenance des kcal, préremplissage d’une page inchangée déjà importée, idempotence, invalidation après changement de la source, sauvegarde/validation du formulaire conservant les métadonnées et sauvegarde d’un brouillon incomplet. Calculs de courses vérifiés sur les ingrédients extraits : poulet 300 g et eau 60 ml pour deux portions ; un seul lot de quatre portions desservant deux repas reste compté une fois. Les allergènes non vérifiés et les équipements inconnus restent exclus des filtres concernés.
+
+Une migration `StructuredRecipeImport` ajoute `Recipes.ImportStateJson`. Le script SQL PostgreSQL est régénéré et le modèle doit correspondre à la dernière migration. La migration et le parcours contre l’instance BookStack réelle restent à exécuter sur le VPS ; les tests de persistance locaux emploient SQLite. Le préremplissage des anciennes fiches est déclenché par une nouvelle synchronisation, sans nécessiter de modifier les pages BookStack.
+
+## Activation privée des imports en lot — 18 novembre 2026
+
+- Ajout de `/Admin/ReviewImports` : analyse des brouillons BookStack, aperçu sans modification, confirmation explicite, ticket signé limité à 30 minutes et lié à l’administrateur. Le lot est rejeté si une révision a changé ; l’enregistrement EF est transactionnel.
+- Migration `20261118212704_PrivateRecipeAvailability` : booléen distinct du statut éditorial, faux par défaut. Aucun changement automatique de publication ou de vérification d’allergènes. Une source modifiée retire cette disponibilité ; une correction locale qui rend la fiche incomplète la retire également.
+- Catalogue privé paginé à 24 fiches, administration/revue à 50, choix du planning limités à 50, recherche sur le catalogue entier. Les données complètes sont chargées pour les fiches affichées et les préparations sauvegardées.
+- 65 tests réussis, dont activation de 2 600 fiches, conservation du statut Brouillon et des allergènes non vérifiés, exclusion du catalogue public, filtres allergènes, affectation au planning, pagination, confirmation, ticket invalide, révision périmée, accès administrateur et antiforgery.
+- Build Release réussi sans avertissement ; modèle EF conforme aux migrations ; SQL PostgreSQL régénéré. Tests exécutés avec SQLite, sans migration d’une base PostgreSQL ni déploiement distant.
+- Chromium : aperçu, case décochée, confirmation et activation privée vérifiés à 390 et 1440 px, sans débordement horizontal. Captures `docs/qa/activation-imports-390.png` et `activation-imports-1440.png`.
+
+### Renforcement du tri des pages BookStack
+
+Extracteur version 2 : l’activation en lot exige une classification source `recipe` (tableau d’ingrédients et préparation numérotée contenant une instruction de cuisine reconnue). Une classification ancienne ou absente exige une resynchronisation. Les pages de liaison, guides et formats non reconnus restent en revue manuelle ; une réanalyse non reconnue retire une ancienne activation privée. La classification est stockée dans le JSON d’import existant, sans nouvelle migration.
+
+70 tests réussis : ajout de cinq cas accueil/index/guide/liste de liens, plus exclusion du lot de pages aux champs artificiellement complets mais non reconnues, et des anciens imports non classés. Les cas recette fournie et HTML restent reconnus. Ce tri est volontairement conservateur : une recette de format différent peut demander une revue manuelle.
+
+### Mode publication publique des imports
+
+Ajout du mode public à la revue en lot : les brouillons et recettes validées importés peuvent être publiés après confirmation, uniquement si la source est reconnue comme recette et les champs obligatoires/allergènes vérifiés. Statut Publiée et slug sont enregistrés atomiquement, sans modifier les données d’allergènes ni ouvrir automatiquement le catalogue. Le ticket signé inclut la destination ; un ticket privé ne peut autoriser la publication. Liste publique paginée à 24 fiches et recherche dans tout le catalogue publié.
+
+Test d’intégration supplémentaire : 26 fiches publiées, fiches inconnues/non vérifiées exclues, destination du ticket contrôlée, URL publique/JSON-LD/sitemap et pagination vérifiés. Chromium : aperçu, confirmation et accès public vérifiés à 390 et 1440 px ; captures `publication-imports-390.png` et `publication-imports-1440.png`. Build Release sans avertissement. Aucune publication distante effectuée.

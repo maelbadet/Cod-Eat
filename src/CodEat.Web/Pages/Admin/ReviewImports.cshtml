@@ -1,0 +1,43 @@
+@page
+@model CodEat.Web.Pages.Admin.ReviewImportsModel
+@{ViewData["Title"]=Model.Publishing?"Publier les recettes importées":"Activer les recettes importées";}
+<p class="eyebrow">CATALOGUE BOOKSTACK</p>
+<h1>@(Model.Publishing?"Vos recettes dans le catalogue public":"Vos recettes dans le planning")</h1>
+<nav class="toolbar" aria-label="Destination des imports"><a asp-route-Mode="public">Publication publique</a><a asp-route-Mode="private">Planning privé</a></nav>
+<p><a asp-page="Recipes">Retour à l’administration</a></p>
+<div asp-validation-summary="All" role="alert"></div>
+<section class="panel">
+<h2>@(Model.Publishing?"Publication en lot":"Activation privée en lot")</h2>
+<p class="notice">Les pages de liaison, index et guides restent hors du lot. Seules les pages reconnues comme recettes dans la source peuvent être activées ici. Un format non reconnu demande une revue manuelle ; le nom de la page ne suffit jamais à la classer.</p>
+<p>@Model.Total fiches importées à examiner · <strong>@Model.EligibleCount @(Model.Publishing?"prêtes à publier":"prêtes à activer")</strong> · @Model.AvailableCount déjà disponibles · @Model.IncompleteCount à vérifier.</p>
+@if(Model.Publishing){
+<p>La publication exige une vraie recette reconnue, les champs obligatoires renseignés et les allergènes explicitement vérifiés. Elle rend les fiches accessibles aux visiteurs et aux moteurs de recherche lorsque le catalogue est ouvert. Les fiches bloquées restent à examiner ; ce bouton ne vérifie pas leurs allergènes.</p>
+<p class="notice">Catalogue public : @(Model.CatalogOpen?"ouvert":"fermé"). <a asp-page="Recipes">Modifier l’ouverture au public</a>.</p>
+}else{
+<p>Les fiches avec un titre, des étapes, des ingrédients, des portions et une catégorie reconnus peuvent rejoindre le planning privé. Les pages de navigation et les fiches incomplètes restent à compléter. Si tous les ingrédients sont absents, commencez par resynchroniser BookStack avec la nouvelle extraction.</p>
+<p>Le statut reste « Brouillon ». Les allergènes ne sont pas déclarés vérifiés et ces recettes restent exclues des recherches avec exclusion d’allergènes. Aucune recette n’est publiée.</p>
+}
+@if(Model.PreviewCount>0){
+<form method="post" asp-page-handler="Apply" class="stack">
+<input asp-for="Mode" type="hidden"/>
+<h3>Aperçu : @Model.PreviewCount recettes @(Model.Publishing?"à publier":"à activer")</h3>
+<input asp-for="Ticket" type="hidden"/>
+<p>Ce lot contient exactement les fiches complètes au moment de l’aperçu. Si une fiche change, il faudra préparer un nouvel aperçu. Validité : 30 minutes.</p>
+<label class="check"><input asp-for="Confirm"/>@(Model.Publishing?"J’ai relu l’aperçu et souhaite publier ces recettes pour les visiteurs et les moteurs de recherche.":"J’ai relu les critères et souhaite utiliser ces recettes dans le planning privé, avec les avertissements sur les données non vérifiées.")</label>
+<button>@(Model.Publishing?$"Publier ces {Model.PreviewCount} recettes":$"Activer ces {Model.PreviewCount} recettes pour le planning")</button>
+<a asp-page="ReviewImports" asp-route-Mode="@Model.Mode">Annuler</a>
+</form>
+}else{
+<form method="post" asp-page-handler="Preview"><input asp-for="Mode" type="hidden"/><button disabled="@(Model.EligibleCount==0)">Préparer l’aperçu du lot (@Model.EligibleCount)</button></form>
+}
+</section>
+<section class="panel"><h2>État des fiches importées</h2>
+<p>Page @Model.CatalogPage / @Model.Pages · 50 fiches par page</p>
+@foreach(var item in Model.Items){
+<p><a asp-page="Recipes" asp-route-id="@item.Id">@item.Title</a><br/>
+<span class="muted">@(item.Problems.Length>0 ? "À compléter : "+string.Join(", ",item.Problems) : Model.Publishing?"Prête pour la publication publique":item.Available ? "Disponible dans le planning privé" : "Prête pour l’activation privée")@(item.UnknownAllergens?" · allergènes non vérifiés":"")</span></p>
+}
+<nav class="toolbar" aria-label="Pages des imports">
+@if(Model.CatalogPage>1){<a asp-route-Mode="@Model.Mode" asp-route-CatalogPage="@(Model.CatalogPage-1)">Précédente</a>}
+@if(Model.CatalogPage<Model.Pages){<a asp-route-Mode="@Model.Mode" asp-route-CatalogPage="@(Model.CatalogPage+1)">Suivante</a>}
+</nav></section>

@@ -40,7 +40,7 @@ Le jeu de démonstration présente le cas de quatre portions préparées le dima
 - Ingrédients : trim, minuscules et espaces normalisés, puis alias **exact** administré ; aucune similarité linguistique. g/kg et ml/cl/L sont convertis ; pièces, cuillères, masse et volume restent distincts. Calculs en `decimal`. Pas de conversion automatique en conditionnements marchands. Une quantité qualitative est signalée à vérifier, même si d’autres quantités chiffrées sont disponibles.
 - Cadence des rappels en mois civils : numéro du mois `année * 12 + mois - 1`, divisé par la cadence et arrondi vers le bas. Le lundi de la semaine détermine la période et la saison ; hiver = décembre–février, automne = septembre–novembre. Une exception mensuelle prime sur la saison, qui prime sur la quantité habituelle. La cadence reste annuelle constante ; les exceptions modifient la quantité. Pour changer une cadence saisonnière, remplacer la règle dans les réglages. Supprimer une règle conserve les rappels déjà générés. Un report clôt l’occurrence courante jusqu’à la période suivante. Ouvrir la page crée l’occurrence mais ne la traite pas. Unicité `(foyer, règle, période)` en base et identifiant stable pour la ligne ajoutée.
 - Les règles se remplacent en supprimant puis recréant une règle ; il n’y a pas d’éditeur en place. Les occurrences déjà créées gardent leur quantité d’origine.
-- BookStack reste propriétaire du titre et du contenu éditorial. Les quantités, portions, description locale, équipements et conservation sont conservés au réimport. Le contenu externe est affiché **en texte encodé**, jamais en HTML actif. Le modèle de page et les routes vérifiées sont dans [docs/bookstack-modele.md](docs/bookstack-modele.md).
+- BookStack reste propriétaire du titre et du contenu éditorial. Les champs préremplis peuvent suivre les mises à jour de la source tant qu’ils n’ont pas été corrigés localement ; les corrections et suppressions locales sont conservées. Les anciennes fiches sans métadonnées gardent leurs valeurs déjà renseignées. Le contenu externe est affiché **en texte encodé**, jamais en HTML actif. Le modèle de page et les routes vérifiées sont dans [docs/bookstack-modele.md](docs/bookstack-modele.md).
 - PDFsharp **6.2.3**, sous licence **MIT** pour cette version (ne pas mettre à niveau vers les versions à licence différente sans revue), et police DejaVu Sans intégrée pour les accents. Licences dans `docs/licenses/`. Les PDF utilisent une composition éditoriale A4 : grands titres, marges régulières, numérotation des sections, tableaux alignés et accents rouges discrets. Les courses présentent les produits et les quantités en colonnes avec cases à cocher dessinées ; les repas sont organisés dans un tableau hebdomadaire, suivi de pages consacrées aux préparations. Les en-têtes de continuation et les pieds de page sont répétés ; le corps reste noir sur blanc, lisible en impression monochrome ; aucune dépendance à une imprimante ou à un navigateur serveur.
 
 ## PostgreSQL et préparation Docker / VPS
@@ -155,3 +155,49 @@ Sur le VPS, après mise à jour du code : `docker compose build app`, puis `dock
 ### Synchronisation BookStack sans attente du proxy
 
 La synchronisation s’exécute maintenant en tâche de fond, avec compteur de fiches et bilan visibles dans Administration. Fermer la page ne l’arrête pas. Le suivi et la file sont en mémoire dans l’unique conteneur applicatif ; après un redémarrage du conteneur, relancer un import interrompu. Le catalogue reste persistant et les imports restent atomiques. Voir [les limites et le diagnostic des 504](docs/bookstack-modele.md).
+
+### Après l’import des recettes
+
+Les recettes importées arrivent en brouillon. Le format de carnet fourni est désormais reconnu en Markdown et en HTML : tableaux d’ingrédients, quantités/unités/états au pesage, portions, catégorie, tags, temps explicites, kcal et provenance, étapes, conservation et service sont préremplis lorsqu’ils sont indiqués. Les valeurs manquantes restent inconnues et les allergènes ne sont jamais confirmés automatiquement. Ouvrir **Administration → Brouillons à compléter**, relire les points à vérifier, confirmer les allergènes après vérification, puis choisir **Valider explicitement la fiche**. Elles deviennent utilisables par le foyer ; il n’est pas nécessaire de les publier.
+
+Pour activer ce préremplissage sur une installation existante, après transfert du code :
+
+```sh
+docker compose build app
+docker compose run --rm app --migrate
+docker compose up -d --force-recreate app
+```
+
+Relancer ensuite **Synchroniser BookStack** : les fiches déjà importées seront préremplies même si leur contenu source n’a pas changé. Les valeurs locales déjà renseignées sont conservées sur les anciennes fiches ; les champs remplis automatiquement sont suivis séparément pour les imports futurs. Voir [le format et les règles de conservation des corrections](docs/bookstack-modele.md).
+
+
+
+### Utiliser un grand catalogue importé dans le planning privé
+
+Après mise à jour du code, exécuter sur le serveur :
+
+```bash
+docker compose build app
+docker compose run --rm app --migrate
+docker compose up -d --force-recreate app
+```
+
+Dans Administration, choisir **Examiner et activer les imports en lot** (`/Admin/ReviewImports`). L’aperçu compte les fiches structurellement complètes et les fiches à compléter. Confirmer le lot rend les fiches complètes disponibles dans le planning privé, sans les publier ni modifier leur statut Brouillon ou leur vérification d’allergènes. Si les ingrédients sont encore absents, resynchroniser BookStack pour appliquer l’extraction structurée avant de préparer le lot. Les corrections locales restent conservées.
+
+Un aperçu expire après 30 minutes et contient les identifiants et révisions exacts des fiches. Une fiche modifiée entraîne le rejet du lot entier. Une modification ultérieure de la source désactive l’accès privé de la fiche concernée jusqu’à une nouvelle revue. Les exclusions d’allergènes continuent d’écarter toutes les fiches non vérifiées ; les écrans et exports conservent les avertissements. La finalisation des exports demande de confirmer ces éléments.
+
+Le catalogue privé affiche 24 recettes par page, l’administration et la revue 50. Le planning propose au maximum 50 choix répartis entre les catégories ; utiliser les filtres pour accéder aux autres recettes. La recherche porte sur tout le catalogue disponible.
+
+### Pages de liaison et guides BookStack
+
+L’activation en lot exige désormais une classification source `recipe` issue de l’extracteur version 2. Un tableau d’ingrédients seul ne suffit pas : la source doit également contenir une préparation numérotée avec une instruction de cuisine reconnue. Les index, accueils, listes de liens et guides restent conservés dans l’administration, hors du lot d’activation. Les formats ambigus passent en revue manuelle ; ce contrôle privilégie l’exclusion en cas de doute, sans prétendre comprendre toute recette possible.
+
+Après cette mise à jour, relancer une synchronisation BookStack avant l’activation en lot : même les pages inchangées sont réanalysées. Les anciens imports sans classification ne peuvent pas être activés en lot. Aucun titre de pays ou de page n’est utilisé seul pour décider. Une page non reconnue ne conserve pas une ancienne activation privée après réanalyse.
+
+### Publication publique des imports en lot
+
+Pour publier les imports, utiliser **Administration → Examiner et publier les imports en lot** (`/Admin/ReviewImports?Mode=public`), après resynchronisation avec l’extracteur version 2. Ce mode inclut les brouillons et fiches validées importés, même déjà disponibles dans le planning privé. Il exige une vraie recette reconnue, les champs structurés obligatoires et les allergènes explicitement vérifiés sur la fiche. Les pages de liaison et les formats non reconnus restent hors du lot. La publication ne coche jamais la vérification des allergènes.
+
+Préparer l’aperçu puis confirmer la publication publique. Un ticket de planning privé ne peut pas autoriser une publication. Les fiches publiées reçoivent leur statut et URL publique ; les anciens slugs restent redirigés. Le catalogue doit aussi être ouvert dans **Administration → Ouverture au public → Catalogue public**. Cette ouverture reste un réglage explicite distinct. La liste publique affiche 24 fiches par page et permet de rechercher dans tout le catalogue publié.
+
+Si toutes les fiches restent bloquées sur « allergènes vérifiés », leur import n’a pas remplacé cette revue : ouvrir et vérifier les fiches avant de préparer un nouveau lot public.

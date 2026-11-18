@@ -48,6 +48,7 @@ public static class Kitchen
     public static string[] Warnings(Preparation p, WeekData data, DateOnly monday)
     {
         var warnings = new List<string>();
+        if (!p.Recipe.AllergensVerified) warnings.Add("Allergènes non vérifiés pour cette recette : vérifiez les ingrédients et les étiquettes.");
         if (p.Frozen)
         {
             if (!p.Recipe.Freezable) warnings.Add("Congélation non validée pour cette recette.");
@@ -86,7 +87,8 @@ public record RecipeFilter(string? Search = null, string? Category = null, int? 
             && (MaxTotal == null || r.TotalMinutes.HasValue && r.TotalMinutes <= MaxTotal)
             && Parts(Include).All(ingredients.Contains) && !Parts(Exclude).Any(ingredients.Contains)
             && (Parts(Allergens).Length == 0 || r.AllergensVerified && !Parts(Allergens).Intersect(Parts(r.Allergens)).Any())
-            && (Equipment == null || Parts(r.Equipment).All(Parts(Equipment).Contains));
+            && (Equipment == null || !string.IsNullOrWhiteSpace(r.Equipment)
+                && (Kitchen.Normalize(r.Equipment) == "aucun" || Parts(r.Equipment).All(Parts(Equipment).Contains)));
     }
 }
 public class HouseholdService(AppDb db)

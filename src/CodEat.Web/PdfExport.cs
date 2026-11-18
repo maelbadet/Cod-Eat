@@ -19,6 +19,7 @@ public partial class PdfExport
             lines.AddRange(group.Select(x =>  $"{(x.Checked ? "[x]" : "[ ]")} {x.Name} : {(x.Adjusted ?? x.Calculated)?.ToString("0.###")} {x.Unit}" + (x.Changed ? " — Quantité modifiée à confirmer" : "")));
         }
         lines.Add("À vérifier");
+        lines.AddRange(data.Preparations.Where(x=>!x.Recipe.AllergensVerified).Select(x=>x.Recipe.Title).Distinct().Select(x=>x+" : allergènes non vérifiés, vérifiez les ingrédients et les étiquettes."));
         lines.AddRange(data.Shopping.Where(x => x.Note != "").Select(x => $"{x.Name} : {x.Note}"));
         lines.AddRange(reminders.Where(x => x.Decision == "En attente").Select(x => $"{x.Product} : {x.Quantity:0.###} {x.Unit}"));
         return string.Join('\n', lines);

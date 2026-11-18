@@ -10,10 +10,11 @@ public partial class PdfExport
         var pending = reminders.Where(x => x.Decision == "En attente").ToArray();
         var products = data.Shopping.Where(x => !x.InStock).ToArray();
         var checks = products.Where(x => x.Note != "" || x.Changed).ToArray();
+        var unknownAllergens = data.Preparations.Where(x=>!x.Recipe.AllergensVerified).Select(x=>x.Recipe.Title).Distinct().ToArray();
         using var report = new EditorialReport("La liste de courses", Period(monday));
         report.Stats((products.Length.ToString(), products.Length == 1 ? "produit à prévoir" : "produits à prévoir"),
             (products.Select(x => x.Aisle).Distinct().Count().ToString(), products.Select(x => x.Aisle).Distinct().Count() == 1 ? "rayon" : "rayons"),
-            ((pending.Length + checks.Length).ToString(), "points à vérifier"));
+            ((pending.Length + checks.Length + unknownAllergens.Length).ToString(), "points à vérifier"));
         var index = 0;
         foreach (var group in products.GroupBy(x => x.Aisle))
         {
@@ -28,10 +29,11 @@ public partial class PdfExport
             }
             report.Gap(12);
         }
-        if (checks.Length > 0 || pending.Length > 0)
+        if (checks.Length > 0 || pending.Length > 0 || unknownAllergens.Length > 0)
         {
             report.Section(++index, "À vérifier avant de partir");
             report.Paragraph("Ces éléments demandent une confirmation et ne sont pas marqués comme achetés.", muted: true);
+            foreach(var title in unknownAllergens) report.Warning(title + " : allergènes non vérifiés. Vérifiez les ingrédients et les étiquettes.");
             foreach (var product in checks)
                 report.Paragraph(product.Name + " — " + (product.Note != "" ? product.Note : "Quantité calculée modifiée à confirmer."));
             foreach (var reminder in pending)

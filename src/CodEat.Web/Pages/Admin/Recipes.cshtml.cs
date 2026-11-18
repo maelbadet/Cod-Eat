@@ -1,4 +1,4 @@
-﻿using CodEat.Web;
+using CodEat.Web;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -6,14 +6,26 @@ using System.Globalization;
 namespace CodEat.Web.Pages.Admin;
 public class RecipesModel(AppDb db,BookStackSyncQueue syncQueue) : PageModel {
  public List<Recipe> Recipes {get;set;}=[];
+ [BindProperty(SupportsGet=true)] public string? StatusFilter { get; set; }
+ public int DraftCount { get; private set; }
+ [BindProperty(SupportsGet=true)] public int CatalogPage { get; set; } = 1;
+ [BindProperty(SupportsGet=true)] public string? Search { get; set; }
+ public int CatalogCount { get; private set; }
+ public int CatalogPages => Math.Max(1,(CatalogCount+49)/50);
  [BindProperty] public Recipe Input {get;set;}=new();
  [BindProperty] public string IngredientsText {get;set;}="";
  public AppSettings Settings {get;set;}=new();
  public BookStackSyncStatus SyncStatus => syncQueue.Snapshot;
  public async Task OnGetAsync(int? id)
  {
-     Recipes = await db.Recipes.AsNoTracking().OrderBy(x => x.Title)
-         .Select(x => new Recipe { Id = x.Id, Title = x.Title, Status = x.Status, Missing = x.Missing }).ToListAsync();
+     DraftCount = await db.Recipes.CountAsync(x => x.Status == "Brouillon");
+     var catalog = db.Recipes.AsNoTracking();
+     if (StatusFilter == "draft") catalog = catalog.Where(x => x.Status == "Brouillon");
+     if (!string.IsNullOrWhiteSpace(Search)) catalog = catalog.Where(x => x.Title.ToLower().Contains(Search.ToLower()));
+     CatalogCount = await catalog.CountAsync();
+     CatalogPage = Math.Clamp(CatalogPage,1,CatalogPages);
+     Recipes = await catalog.OrderBy(x => x.Title).ThenBy(x=>x.Id).Skip((CatalogPage-1)*50).Take(50)
+         .Select(x => new Recipe { Id = x.Id, Title = x.Title, Status = x.Status, Missing = x.Missing, AvailablePrivately=x.AvailablePrivately }).ToListAsync();
      Settings = await db.Settings.SingleAsync();
      if (id.HasValue)
      {
@@ -39,23 +51,28 @@ public class RecipesModel(AppDb db,BookStackSyncQueue syncQueue) : PageModel {
  try{
  if(!ModelState.IsValid)throw new InvalidOperationException("Vérifiez les valeurs des champs du formulaire.");
  foreach(var property in typeof(Recipe).GetProperties().Where(p=>p.PropertyType==typeof(string)&&p.CanWrite)){if(property.GetValue(Input)==null)property.SetValue(Input,"");}
- var ingredients=new List<Ingredient>();foreach(var line in IngredientsText.Split('\n',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)){var parts=line.Split('|');if(parts.Length<4)throw new InvalidOperationException("Chaque ingrédient doit suivre le format indiqué.");decimal? quantity=string.IsNullOrWhiteSpace(parts[1])?null:decimal.Parse(parts[1].Replace(',','.'),CultureInfo.InvariantCulture);if(quantity<0||string.IsNullOrWhiteSpace(parts[0]))throw new InvalidOperationException("Ingrédient ou quantité invalide.");ingredients.Add(new(Kitchen.Normalize(parts[0]),quantity,parts[2].Trim(),parts[3].Trim(),parts.Length>4?parts[4].Trim():""));}
- if(Input.Servings<=0||Input.ActiveMinutes<0||Input.CookMinutes<0||Input.TotalMinutes<0||Input.Kcal<0||Input.FridgeHours<0||Input.FreezerDays<0||Input.Category is not("Terre" or "Mer" or "Terre & Mer"))throw new InvalidOperationException("Vérifiez les portions, durées et catégorie.");
+ var ingredients=new List<Ingredient>();foreach(var line in (IngredientsText ?? string.Empty).Split('\n',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)){var parts=line.Split('|');if(parts.Length<4)throw new InvalidOperationException("Chaque ingrédient doit suivre le format indiqué.");decimal? quantity=string.IsNullOrWhiteSpace(parts[1])?null:decimal.Parse(parts[1].Replace(',','.'),CultureInfo.InvariantCulture);if(quantity<0||string.IsNullOrWhiteSpace(parts[0]))throw new InvalidOperationException("Ingrédient ou quantité invalide.");ingredients.Add(new(Kitchen.Normalize(parts[0]),quantity,parts[2].Trim(),parts[3].Trim(),parts.Length>4?parts[4].Trim():""));}
+ if(Input.Servings<0||Input.ActiveMinutes<0||Input.CookMinutes<0||Input.TotalMinutes<0||Input.Kcal<0||Input.FridgeHours<0||Input.FreezerDays<0||Input.Category!="" && Input.Category is not("Terre" or "Mer" or "Terre & Mer"))throw new InvalidOperationException("Vérifiez les portions, durées et catégorie.");
  Input.Ingredients=ingredients;
  var target=Input.Id==0?new Recipe():await db.Recipes.SingleAsync(x=>x.Id==Input.Id);
  if(Input.Id!=0&&target.Revision!=Input.Revision)throw new DbUpdateConcurrencyException();
  if(target.BookStackId!=null){Input.Title=target.Title;Input.Steps=target.Steps;}
  if(action is "validate" or "publish"&&Input.MissingFields().Length>0)throw new InvalidOperationException("À renseigner : "+string.Join(", ",Input.MissingFields()));
+ var importState = RecipeImportMerge.RememberLocalEdits(target, Input);
+ var privateAvailability=target.AvailablePrivately;
  var oldSlug=target.Slug;var book=target.BookStackId;var hash=target.SourceHash;var missing=target.Missing;var oldSlugs=target.OldSlugs;
- db.Entry(target).CurrentValues.SetValues(Input);target.BookStackId=book;target.SourceHash=hash;target.Missing=missing;target.OldSlugs=oldSlugs;target.Revision=Guid.NewGuid();target.Status=action=="publish"?"Publiée":action=="validate"?"Validée":"Brouillon";
+ db.Entry(target).CurrentValues.SetValues(Input);target.BookStackId=book;target.SourceHash=hash;target.ImportStateJson=importState;target.Missing=missing;target.OldSlugs=oldSlugs;target.Revision=Guid.NewGuid();target.Status=action=="publish"?"Publiée":action=="validate"?"Validée":"Brouillon";
+ target.AvailablePrivately=privateAvailability && RecipeAvailability.PrivatePlanningProblems(target).Length==0;
  if(action=="publish"){var slug=Kitchen.Slug(target.Title);if(oldSlug!=""&&oldSlug!=slug)target.OldSlugs=oldSlugs+"|"+oldSlug;target.Slug=slug;}
  if(target.Id==0)db.Recipes.Add(target);await db.SaveChangesAsync();TempData["Message"]="Fiche enregistrée : "+target.Status;return RedirectToPage(new{id=target.Id});
  }catch(DbUpdateConcurrencyException){ModelState.AddModelError("","Fiche modifiée par une autre personne. Rechargez la page.");Response.StatusCode=409;}catch(Exception ex)when(ex is InvalidOperationException or FormatException){ModelState.AddModelError("",ex.Message);}
- Recipes=await db.Recipes.ToListAsync();Settings=await db.Settings.SingleAsync();return Page();
+ Recipes=await db.Recipes.AsNoTracking().OrderBy(x=>x.Title).Take(50).Select(x=>new Recipe{Id=x.Id,Title=x.Title,Status=x.Status}).ToListAsync();Settings=await db.Settings.SingleAsync();
+ if(Input.Id != 0)
+ {
+     var metadata = await db.Recipes.AsNoTracking().Where(x => x.Id == Input.Id)
+         .Select(x => new { x.BookStackId, x.ImportStateJson }).SingleOrDefaultAsync();
+     if(metadata != null) { Input.BookStackId = metadata.BookStackId; Input.ImportStateJson = metadata.ImportStateJson; }
+ }
+ return Page();
  }
 }
-
-
-
-
-

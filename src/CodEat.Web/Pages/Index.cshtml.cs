@@ -20,6 +20,21 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  public Week Week {get;set;} = new();
  public WeekData Data {get;set;} = new();
  public List<Recipe> Recipes {get;set;} = [];
+ public int DraftRecipeCount { get; private set; }
+ public int ReadyRecipeCount { get; private set; }
+ [BindProperty(SupportsGet=true)] public int CatalogPage { get; set; } = 1;
+ public int MatchingRecipeCount { get; private set; }
+ public int CatalogPages => Math.Max(1,(MatchingRecipeCount+23)/24);
+ public Dictionary<string,string> CatalogRoutes(int page) => new() {
+ ["Tab"]="recipes", ["CatalogPage"]=page.ToString(), ["Date"]=Week.Monday.ToString("yyyy-MM-dd"),
+ ["Search"]=Search??"", ["Category"]=Category??"", ["MaxKcal"]=MaxKcal?.ToString()??"",
+ ["MaxActive"]=MaxActive?.ToString()??"", ["MaxTotal"]=MaxTotal?.ToString()??"",
+ ["Include"]=Include??"", ["Exclude"]=Exclude??"", ["Allergens"]=Allergens??"", ["EquipmentFilter"]=EquipmentFilter.ToString() };
+ public string EmptyRecipeMessage => DraftRecipeCount > 0 && ReadyRecipeCount == 0
+     ? $"Vos recettes sont importées : {DraftRecipeCount} fiche(s) en brouillon attendent leur validation."
+     : DraftRecipeCount + ReadyRecipeCount == 0
+         ? "Aucune recette n’a encore été importée ou créée."
+         : "Aucune recette ne correspond à ces filtres. Essayez de les élargir ou de les effacer.";
  public List<Reminder> Reminders {get;set;} = [];
  public List<ReminderRule> Rules {get;set;} = [];
  public List<ExportVersion> Versions {get;set;} = [];
@@ -30,7 +45,20 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  async Task Load() {
  var id = await HouseholdId(); Household = await db.Households.SingleAsync(x=>x.Id==id);
  Week=await households.GetWeek(id, Date ?? Kitchen.Today); Data=Week.Data;
- Recipes=(await db.Recipes.Where(x=>x.Status!="Brouillon").OrderBy(x=>x.Category).ThenBy(x=>x.Title).ToListAsync()).Where(new RecipeFilter(Search,Category,MaxKcal,MaxActive,MaxTotal,Include,Exclude,Allergens,EquipmentFilter?Household.Equipment:null).Matches).ToList();
+ var availableRecipes = await db.Recipes.AsNoTracking().Where(RecipeAvailability.Available).OrderBy(x=>x.Category).ThenBy(x=>x.Title).ThenBy(x=>x.Id)
+ .Select(x=>new Recipe {Id=x.Id,Title=x.Title,Category=x.Category,Servings=x.Servings,Kcal=x.Kcal,
+ ActiveMinutes=x.ActiveMinutes,TotalMinutes=x.TotalMinutes,Allergens=x.Allergens,AllergensVerified=x.AllergensVerified,
+ Equipment=x.Equipment,IngredientsJson=x.IngredientsJson}).ToListAsync();
+ ReadyRecipeCount = availableRecipes.Count;
+ DraftRecipeCount = await db.Recipes.CountAsync(x=>x.Status=="Brouillon" && !x.AvailablePrivately);
+ var matching=availableRecipes.Where(new RecipeFilter(Search,Category,MaxKcal,MaxActive,MaxTotal,Include,Exclude,Allergens,EquipmentFilter?Household.Equipment:null).Matches).ToList();
+ MatchingRecipeCount=matching.Count;
+ CatalogPage=Math.Clamp(CatalogPage,1,CatalogPages);
+ var selected=Tab=="recipes" ? matching.Skip((CatalogPage-1)*24).Take(24).ToList()
+ : matching.GroupBy(x=>x.Category).SelectMany(g=>g.Select((r,i)=>new{Recipe=r,Rank=i})).OrderBy(x=>x.Rank).ThenBy(x=>x.Recipe.Category).Take(50).Select(x=>x.Recipe).ToList();
+ var selectedIds=selected.Select(x=>x.Id).ToArray();
+ var full=await db.Recipes.AsNoTracking().Where(x=>selectedIds.Contains(x.Id)).ToDictionaryAsync(x=>x.Id);
+ Recipes=selected.Select(x=>full[x.Id]).ToList();
  await households.EnsureReminders(id,Week.Monday);
  Reminders=await db.Reminders.Where(x=>x.HouseholdId==id && x.Decision=="En attente").ToListAsync();
  Rules=await db.Rules.Where(x=>x.HouseholdId==id).ToListAsync(); Versions=await db.Exports.Where(x=>x.HouseholdId==id&&x.WeekId==Week.Id).OrderByDescending(x=>x.Version).ToListAsync(); CopyText=PdfExport.ShoppingText(Data,Reminders);
@@ -43,13 +71,13 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  if(Week.Revision!=revision)throw new DbUpdateConcurrencyException();
  switch(action) {
  case "assign":
- if(preparationId==Guid.Empty) { var recipe=await db.Recipes.SingleOrDefaultAsync(x=>x.Id==recipeId&&x.Status!="Brouillon"); if(recipe==null) return NotFound(); if(prepared<=0||portions<=0)throw new InvalidOperationException("Indiquez des portions positives."); var p=new Preparation{Recipe=recipe,Portions=prepared,At=at==default?Week.Monday.AddDays(-1).ToDateTime(new TimeOnly(16,0)):DateTime.SpecifyKind(at,DateTimeKind.Unspecified),Frozen=frozen}; Data.Preparations.Add(p); preparationId=p.Id; }
+ if(preparationId==Guid.Empty) { var recipe=await db.Recipes.Where(RecipeAvailability.Available).SingleOrDefaultAsync(x=>x.Id==recipeId); if(recipe==null) return NotFound(); if(prepared<=0||portions<=0)throw new InvalidOperationException("Indiquez des portions positives."); var p=new Preparation{Recipe=recipe,Portions=prepared,At=at==default?Week.Monday.AddDays(-1).ToDateTime(new TimeOnly(16,0)):DateTime.SpecifyKind(at,DateTimeKind.Unspecified),Frozen=frozen}; Data.Preparations.Add(p); preparationId=p.Id; }
  Kitchen.Assign(Data,new(day,slot,preparationId,portions)); break;
  case "remove": Data.Meals.RemoveAll(x=>x.Day==day&&x.Slot==slot); break;
  case "move": var moved=Data.Meals.Single(x=>x.PreparationId==preparationId&&x.Day==int.Parse(key!)&&x.Slot==decision); Data.Meals.Remove(moved); Kitchen.Assign(Data,moved with{Day=day,Slot=slot}); break;
  case "prepare": var prep=Data.Preparations.Single(x=>x.Id==preparationId); if(prepared<=0||prepared<Data.Meals.Where(x=>x.PreparationId==prep.Id).Sum(x=>x.Portions))throw new InvalidOperationException("Le lot ne peut pas être inférieur aux portions affectées."); prep.Portions=prepared; prep.At=DateTime.SpecifyKind(at,DateTimeKind.Unspecified); prep.Frozen=frozen; break;
  case "suggest":
- if(Recipes.Count==0)throw new InvalidOperationException("Aucune recette compatible avec ces filtres.");
+ if(Recipes.Count==0)throw new InvalidOperationException(EmptyRecipeMessage);
  var index=0; var varied=Recipes.GroupBy(r=>r.Category).SelectMany(g=>g.Select((r,i)=>new{Recipe=r,Rank=i})).OrderBy(x=>x.Rank).ThenBy(x=>x.Recipe.Category).Select(x=>x.Recipe).ToList(); for(var d=0;d<7;d++)foreach(var s in new[]{"Midi","Soir"}) {if(Data.Meals.Any(x=>x.Day==d&&x.Slot==s))continue; var r=varied[index++%varied.Count]; var p=new Preparation{Recipe=r,Portions=2,At=Week.Monday.AddDays(-1).ToDateTime(new TimeOnly(16,0))}; Data.Preparations.Add(p); Kitchen.Assign(Data,new(d,s,p.Id,2));} break;
  case "line": var line=Data.Shopping.Single(x=>x.Key==key); if(quantity<0)throw new InvalidOperationException("Quantité positive requise."); line.Adjusted=quantity; line.Checked=decision==null?bought:decision=="acheté"; line.InStock=decision=="stock"; line.Changed=false; break;
  case "manual": if(string.IsNullOrWhiteSpace(name)||quantity<0)throw new InvalidOperationException("Produit et quantité valides requis."); Data.Shopping.Add(new(){Name=name,Calculated=quantity,Unit=unit??"",Aisle=aisle??"Divers",Manual=true}); break;
@@ -62,7 +90,7 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  case "delete-rule": var rule=await db.Rules.SingleOrDefaultAsync(x=>x.Id==reminderId&&x.HouseholdId==Household.Id); if(rule==null)return NotFound(); db.Rules.Remove(rule); break;
  case "finalize":
  Kitchen.Regenerate(Data,await db.Aliases.ToDictionaryAsync(x=>x.Alias,x=>x.Canonical));
- if(!confirm && (Reminders.Any()||Data.Shopping.Any(x=>x.Changed||x.Note!="")))throw new InvalidOperationException("Des éléments restent à vérifier. Cochez la confirmation pour les inclure dans l’export.");
+ if(!confirm && (Reminders.Any()||Data.Shopping.Any(x=>x.Changed||x.Note!="")||Data.Preparations.Any(x=>!x.Recipe.AllergensVerified)))throw new InvalidOperationException("Des éléments restent à vérifier, notamment les allergènes des recettes importées. Cochez la confirmation pour les inclure dans l’export.");
  var version=Versions.Count==0?1:Versions.Max(x=>x.Version)+1;
  db.Exports.Add(new(){HouseholdId=Household.Id,WeekId=Week.Id,Version=version,Snapshot=System.Text.Json.JsonSerializer.Serialize(Data),ShoppingPdf=pdf.CreateShopping(Data,Reminders,Week.Monday),MealsPdf=pdf.CreateMeals(Data,Week.Monday)}); break;
  case "invite":

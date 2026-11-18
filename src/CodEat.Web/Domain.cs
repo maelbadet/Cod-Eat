@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -35,12 +36,16 @@ public class Recipe
     public string Thaw { get; set; } = "";
     public string Reheat { get; set; } = "";
     public string Status { get; set; } = "Brouillon";
+    public bool AvailablePrivately { get; set; }
     public string Slug { get; set; } = "";
     public string OldSlugs { get; set; } = "";
     public string IngredientsJson { get; set; } = "[]";
+    public string ImportStateJson { get; set; } = "{}";
+    [NotMapped, System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<string> ImportReviewNotes => RecipeImportState.Read(ImportStateJson).ReviewNotes;
     public Guid Revision { get; set; } = Guid.NewGuid();
     public List<Ingredient> Ingredients { get => JsonSerializer.Deserialize<List<Ingredient>>(IngredientsJson)!; set => IngredientsJson = JsonSerializer.Serialize(value); }
-    public string[] MissingFields() => new[] { string.IsNullOrWhiteSpace(Title) ? "titre" : "", string.IsNullOrWhiteSpace(Steps) ? "étapes" : "", Servings <= 0 ? "portions" : "", Ingredients.Count == 0 ? "ingrédients" : "", !AllergensVerified ? "allergènes vérifiés" : "" }.Where(x => x != "").ToArray();
+    public string[] MissingFields() => new[] { string.IsNullOrWhiteSpace(Title) ? "titre" : "", string.IsNullOrWhiteSpace(Steps) ? "étapes" : "", Category is not ("Terre" or "Mer" or "Terre & Mer") ? "catégorie" : "", Servings <= 0 ? "portions" : "", Ingredients.Count == 0 ? "ingrédients" : "", Kcal.HasValue && string.IsNullOrWhiteSpace(KcalSource) ? "provenance des kcal" : "", !AllergensVerified ? "allergènes vérifiés" : "" }.Where(x => x != "").ToArray();
 }
 public record Ingredient(string Canonical, decimal? Quantity, string Unit, string Aisle, string Comment = "");
 public class Week

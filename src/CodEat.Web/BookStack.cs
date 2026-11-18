@@ -54,7 +54,8 @@ public class BookStackClient(HttpClient http, IConfiguration config)
                 var id = item.GetProperty("id").GetInt32();
                 using var page = await GetJson($"api/pages/{id}", ct);
                 if (page.RootElement.GetProperty("book_id").GetInt32() != book) throw new BookStackFailure("BS_CHANGED", "Le livre a changé pendant la synchronisation. Réessayez pour obtenir un catalogue cohérent.");
-                var text = page.RootElement.TryGetProperty("markdown", out var md) && !string.IsNullOrWhiteSpace(md.GetString()) ? md.GetString()! : WebUtility.HtmlDecode(Regex.Replace(page.RootElement.GetProperty("html").GetString() ?? "", "<[^>]*>", " ", RegexOptions.None, TimeSpan.FromSeconds(1)));
+                var text = page.RootElement.TryGetProperty("markdown", out var md) && !string.IsNullOrWhiteSpace(md.GetString())
+                    ? md.GetString()! : BookStackContent.FromHtml(page.RootElement.GetProperty("html").GetString() ?? "");
                 result.Add(new(id, page.RootElement.GetProperty("name").GetString()!, text));
                 progress?.Invoke(new(result.Count, total, "Lecture des fiches BookStack"));
             }
@@ -87,19 +88,34 @@ public class BookStackSync(AppDb db, BookStackClient client)
         ct.ThrowIfCancellationRequested();
         progress?.Invoke(new(pages.Count, pages.Count, "Enregistrement du catalogue"));
         var recipes = await db.Recipes.Where(x => x.BookStackId != null).ToListAsync(ct);
-        int created = 0, updated = 0, same = 0;
+        int created = 0, updated = 0, same = 0, enriched = 0;
         foreach (var p in pages)
         {
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(p.Name + "\n" + p.Text)));
             var r = recipes.SingleOrDefault(x => x.BookStackId == p.Id);
+            var isNew = r == null;
+            var sourceChanged = r?.SourceHash != hash;
+            if (r != null && !sourceChanged && RecipeImportState.Read(r.ImportStateJson).Version >= RecipePageParser.Version)
+            { r.Missing = false; same++; continue; }
             if (r == null) { r = new Recipe { BookStackId = p.Id }; db.Recipes.Add(r); created++; }
-            else if (r.SourceHash == hash) { r.Missing = false; same++; continue; }
-            else updated++;
-            // Editorial fields belong to BookStack; local structured enrichment is preserved.
-            r.Title = p.Name; r.Steps = p.Text; r.SourceHash = hash; r.Missing = false; r.Status = "Brouillon"; r.Revision = Guid.NewGuid();
+            else if (sourceChanged) updated++;
+            else enriched++;
+            var parsed = RecipePageParser.Parse(p.Text);
+            var steps = parsed.Recognized ? parsed.Steps : p.Text;
+            var editorialChanged = r.Title != p.Name || r.Steps != steps;
+            var structuredChanged = RecipeImportMerge.Apply(r, parsed, isNew);
+            // The parser pre-fills data, but never verifies allergens or publishes recipes.
+            if (sourceChanged || structuredChanged || editorialChanged || !parsed.Recognized)
+            {
+                r.Status = "Brouillon";
+                r.AllergensVerified = false;
+                r.AvailablePrivately = false;
+            }
+            r.Title = p.Name; r.Steps = steps; r.SourceHash = hash; r.Missing = false; r.Revision = Guid.NewGuid();
         }
         foreach (var r in recipes.Where(x => !pages.Any(p => p.Id == x.BookStackId))) r.Missing = true;
         await db.SaveChangesAsync(ct);
-        return $"{created} créée(s), {updated} mise(s) à jour, {same} inchangée(s), 0 erreur. {recipes.Count(x => x.Missing)} absente(s) du livre.";
+        return $"{created} créée(s), {updated} mise(s) à jour, {enriched} préremplie(s), {same} inchangée(s), 0 erreur. {recipes.Count(x => x.Missing)} absente(s) du livre."
+            + (created + updated + enriched > 0 ? " Les données reconnues ont été préremplies. Relisez les points à vérifier et validez les brouillons dans Administration pour les utiliser dans le planning." : "");
     }
 }

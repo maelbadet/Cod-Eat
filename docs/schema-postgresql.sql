@@ -243,3 +243,19 @@ VALUES ('20261118131723_HouseholdMemberSlots', '10.0.0');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "Recipes" ADD "ImportStateJson" text NOT NULL DEFAULT '{}';
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261118205158_StructuredRecipeImport', '10.0.0');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "Recipes" ADD "AvailablePrivately" boolean NOT NULL DEFAULT FALSE;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261118212704_PrivateRecipeAvailability', '10.0.0');
+
+COMMIT;
+

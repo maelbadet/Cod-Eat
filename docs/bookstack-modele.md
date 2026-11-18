@@ -1,22 +1,48 @@
-﻿# BookStack — modèle de recette
+﻿# BookStack — format de recette et import structuré
 
-Une page correspond à une recette. Son titre et son contenu éditorial sont gérés dans BookStack. Exemple de titre : « Cabillaud citron & pommes de terre ».
+Le carnet fourni « Inspiration / Repère / Ingrédients / Préparation / Cuisiner à deux et conserver / Allergènes et énergie » est reconnu en Markdown et dans le HTML de l’API. L’HTML est transformé en texte inerte en conservant titres, listes et tableaux. Les images, scripts, styles et cibles des liens ne sont pas exécutés ni importés dans les champs affichés.
 
-## Description
-Un plat familial pour deux repas.
+## Exemple de structure reconnue
 
-## Ingrédients (4 portions)
-- Cabillaud : 600 g
-- Pommes de terre : 1 kg
-- Citron : 1 pièce
-- Sel : selon le goût
+Les valeurs de cet exemple sont éditoriales et doivent être adaptées à votre fiche réelle. Les durées de conservation doivent être renseignées à partir de vos consignes validées.
 
-## Étapes
+```markdown
+# Cabillaud citron & pommes de terre
+
+**Inspiration : France · Mer · Chaud**
+
+Une recette pour **4 portions individuelles**, soit deux repas à deux.
+
+| Repère | Valeur |
+|---|---|
+| Temps actif indicatif | 15 min |
+| Temps de cuisson | 30 min |
+| Temps total indicatif | 45 min |
+| Énergie estimée | à renseigner |
+
+## Ingrédients
+
+| Ingrédient | Quantité pour 4 | État au pesage |
+|---|---|---|
+| cabillaud | 600 g | cru, net |
+| pommes de terre | 1 kg | poids net |
+| citron | 1 pièce | entier |
+| huile de colza | 30 g | prête à utiliser |
+| sel | selon le goût | facultatif |
+
+## Préparation
+
 1. Laver et couper les pommes de terre.
-2. Les cuire au four avec l’huile.
-3. Ajouter le poisson et le citron ; poursuivre jusqu’à cuisson complète.
+2. Les cuire au four avec l’huile prévue dans la fiche.
+3. Ajouter le poisson et le citron, puis poursuivre jusqu’à cuisson complète.
 
-Après import, compléter les données structurées dans Administration. Le contenu libre reste du texte encodé : aucun HTML externe n’est exécuté. L’import ne tente pas de deviner les quantités, allergènes ou durées de conservation. Une recette arrive en brouillon. Le titre et les étapes d’une fiche importée se corrigent dans BookStack ; les autres champs se corrigent dans Cod & Eat. Une mise à jour éditoriale repasse la fiche en brouillon sans toucher aux données structurées ni aux copies déjà planifiées.
+## Allergènes et énergie
+
+- Allergènes identifiés dans les ingrédients : poisson.
+- Étiquettes à vérifier : les produits réellement utilisés.
+```
+
+Le titre et les étapes restent gérés dans BookStack. Le titre de l’API est conservé ; les étapes sont extraites de la section Préparation/Étapes/Instructions. Les champs reconnus sont préremplis, mais la fiche reste en brouillon et `Allergènes vérifiés` reste décoché. Une page sans tableau d’ingrédients ou sans section d’étapes reste à structurer manuellement ; les pages de navigation ne sont pas transformées artificiellement en recettes prêtes à planifier.
 
 API vérifiée dans les sources officielles BookStack :
 - https://github.com/BookStackApp/BookStack/blob/development/app/Entities/Controllers/PageApiController.php
@@ -67,11 +93,65 @@ Une seule synchronisation peut être active dans le conteneur applicatif. Le ser
 
 Le suivi est en mémoire et prévu pour l’unique conteneur `app` du Compose fourni. Fermer le navigateur ne l’interrompt pas ; redémarrer le conteneur l’interrompt et réinitialise le suivi. Dans ce cas, relancer explicitement l’import après redémarrage. Le catalogue persistant contient soit la version précédente, soit un import entièrement validé par la transaction. Ne pas déployer plusieurs instances applicatives avec cette file en mémoire sans ajouter un verrou et une file distribués.
 
-Mise à jour sur le VPS (aucune migration de base supplémentaire pour ce changement) :
+Mise à jour sur le VPS (les migrations sont relançables et appliquent aussi le schéma de la version courante) :
 
 ```sh
 docker compose build app
+docker compose run --rm app --migrate
 docker compose up -d --force-recreate app
 ```
 
 Une erreur 504 affichée directement par le navigateur peut provenir du proxy devant Cod & Eat lorsque l’ancienne synchronisation gardait la requête ouverte trop longtemps. Avec cette version, si le suivi affiche plutôt `[BS_HTTP_504]`, c’est une réponse 504 reçue depuis l’API BookStack ou son proxy : examiner alors les journaux et ressources de BookStack, de sa base et de son proxy. Si le navigateur reçoit encore une 504 dès le clic, vérifier que la nouvelle image a bien été reconstruite et déployée, puis les journaux de l’application et de Nginx Proxy Manager.
+
+
+## Préremplissage du carnet et revue
+
+Une nouvelle synchronisation traite aussi les fiches existantes dont le texte n’a pas changé lorsque la version d’extraction est nouvelle. La migration `StructuredRecipeImport` ajoute uniquement une colonne de métadonnées à Recipes, sans supprimer les recettes, les semaines ou les exports.
+
+Après déploiement du code :
+
+```sh
+docker compose build app
+docker compose run --rm app --migrate
+docker compose up -d --force-recreate app
+```
+
+Relancer Synchroniser BookStack dans Administration, attendre le bilan puis ouvrir **Brouillons à compléter**. Les notes indiquent les informations à vérifier. Après lecture des ingrédients et des étiquettes, confirmer les allergènes et choisir **Valider explicitement la fiche** ; publier n’est pas nécessaire pour un foyer privé.
+
+### Valeurs reprises et inconnues
+
+- Seul le tableau d’ingrédients est utilisé pour les lignes de courses. Les produits cités dans les substitutions, les saveurs ou les instructions génériques ne sont pas ajoutés comme ingrédients supplémentaires.
+- Les noms sont conservés, avec normalisation de casse et d’espaces. Les alternatives telles que « huile de colza ou d’olive » ne sont ni divisées ni regroupées avec un autre produit.
+- Les quantités numériques, décimales et fractions usuelles gardent leur unité ; aucune équivalence cuillère/pièce/masse/volume n’est inventée. Les quantités qualitatives ou ambiguës restent vides, avec la valeur source en commentaire et un point à vérifier.
+- Les portions viennent de l’introduction et de l’en-tête du tableau. Une contradiction laisse le nombre inconnu sur une nouvelle fiche.
+- Les kcal sont reprises par portion avec leur provenance. Aucun calcul nutritionnel n’est inventé. Une correction locale des kcal ne garde pas automatiquement l’attribution de la valeur importée ; renseigner sa provenance avant validation.
+- Les temps globaux sont repris seulement s’ils sont explicitement fournis. Le temps de cuisson n’est pas calculé en soustrayant le temps actif du total.
+- Les informations de conservation et de service sont reprises comme propositions à vérifier. La mention « Organisation prévue sous 48 h » est reconnue comme repère source ; les instructions et réserves restent visibles dans les notes. Aucune durée de congélation ni consigne de décongélation absente n’est créée.
+- La mention « aucun identifié » reste une déclaration de la source, sans confirmer l’absence d’allergènes. Les étiquettes à vérifier sont conservées. Le filtre d’exclusion continue de rejeter une fiche aux allergènes non vérifiés.
+- Les appareils ne sont pas déduits d’une référence occasionnelle dans les étapes : une section explicite Ustensiles/Équipements/Matériel est reprise, sinon le champ reste à compléter et un filtre d’équipements exclut la donnée inconnue.
+- Les rayons sont proposés pour des noms exacts courants et restent à relire. Les autres produits sont marqués « À classer ».
+
+Pour la poêlée fournie : 11 ingrédients, 4 portions, 20 min actives, 45 min au total, ~610 kcal estimées par portion et un repère de 48 h repris de la source. Le temps de cuisson global, la durée de congélation et la décongélation restent inconnus. Les huit étapes restent distinctes des autres sections. La source non testée et les réserves sur les allergènes sont signalées.
+
+### Corrections locales et mises à jour
+
+Pour chaque champ prérempli, une empreinte de la dernière valeur appliquée est conservée. Tant que cette valeur n’a pas été modifiée localement, une évolution de la source peut la mettre à jour. Une correction locale, y compris une suppression volontaire, est conservée lors des synchronisations suivantes. Modifier la liste d’ingrédients la rend locale dans son ensemble : une évolution du tableau source est alors signalée pour revue plutôt que d’écraser la liste corrigée.
+
+Pour les anciennes fiches sans métadonnées, les champs vides sont complétés et les valeurs déjà renseignées sont conservées. Cela inclut les anciens défauts de portions, catégorie et congélation : lorsqu’ils diffèrent de la source, les notes affichent les deux valeurs à comparer. Les semaines et préparations déjà créées gardent leurs copies ; une nouvelle finalisation reste nécessaire pour créer de nouveaux exports.
+
+Toute modification éditoriale ou structurée importée qui affecte une fiche la remet en brouillon et retire la vérification des allergènes. Une synchronisation réellement inchangée ne retire pas la validation. Il n’existe ni validation ni publication automatique.
+
+
+### Pages de liaison et guides BookStack
+
+L’activation en lot exige désormais une classification source `recipe` issue de l’extracteur version 2. Un tableau d’ingrédients seul ne suffit pas : la source doit également contenir une préparation numérotée avec une instruction de cuisine reconnue. Les index, accueils, listes de liens et guides restent conservés dans l’administration, hors du lot d’activation. Les formats ambigus passent en revue manuelle ; ce contrôle privilégie l’exclusion en cas de doute, sans prétendre comprendre toute recette possible.
+
+Après cette mise à jour, relancer une synchronisation BookStack avant l’activation en lot : même les pages inchangées sont réanalysées. Les anciens imports sans classification ne peuvent pas être activés en lot. Aucun titre de pays ou de page n’est utilisé seul pour décider. Une page non reconnue ne conserve pas une ancienne activation privée après réanalyse.
+
+### Publication publique des imports en lot
+
+Pour publier les imports, utiliser **Administration → Examiner et publier les imports en lot** (`/Admin/ReviewImports?Mode=public`), après resynchronisation avec l’extracteur version 2. Ce mode inclut les brouillons et fiches validées importés, même déjà disponibles dans le planning privé. Il exige une vraie recette reconnue, les champs structurés obligatoires et les allergènes explicitement vérifiés sur la fiche. Les pages de liaison et les formats non reconnus restent hors du lot. La publication ne coche jamais la vérification des allergènes.
+
+Préparer l’aperçu puis confirmer la publication publique. Un ticket de planning privé ne peut pas autoriser une publication. Les fiches publiées reçoivent leur statut et URL publique ; les anciens slugs restent redirigés. Le catalogue doit aussi être ouvert dans **Administration → Ouverture au public → Catalogue public**. Cette ouverture reste un réglage explicite distinct. La liste publique affiche 24 fiches par page et permet de rechercher dans tout le catalogue publié.
+
+Si toutes les fiches restent bloquées sur « allergènes vérifiés », leur import n’a pas remplacé cette revue : ouvrir et vérifier les fiches avant de préparer un nouveau lot public.

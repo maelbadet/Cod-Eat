@@ -251,6 +251,9 @@ namespace CodEat.Web.Migrations
                     b.Property<bool>("AllergensVerified")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AvailablePrivately")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("BookStackId")
                         .HasColumnType("integer");
 
@@ -281,6 +284,10 @@ namespace CodEat.Web.Migrations
 
                     b.Property<int?>("FridgeHours")
                         .HasColumnType("integer");
+
+                    b.Property<string>("ImportStateJson")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("IngredientsJson")
                         .IsRequired()
