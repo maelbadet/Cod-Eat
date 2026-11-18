@@ -1,0 +1,9 @@
+﻿**/bin
+**/obj
+.git
+.env
+.qa
+node_modules
+**/.keys
+**/*.db*
+**/*.pfx

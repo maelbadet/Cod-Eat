@@ -1,0 +1,1 @@
+{"private":true,"type":"module","devDependencies":{"@playwright/test":"1.60.0","lighthouse":"^13.6.0"},"scripts":{"qa":"node tools/browser-qa.mjs"}}

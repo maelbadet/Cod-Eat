@@ -1,0 +1,25 @@
+﻿@using CodEat.Web
+@{ var activeTab = Context.Request.Query["Tab"].FirstOrDefault() ?? "week"; }
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>@ViewData["Title"] · Cod &amp; Eat</title><meta name="description" content="@(ViewData["Description"]??"Planifiez vos repas, préparez vos courses et cuisinez votre semaine avec Cod & Eat.")"/>
+@if(ViewData["Canonical"] is string canonical){<link rel="canonical" href="@canonical"/><meta property="og:url" content="@canonical"/><meta property="og:title" content="@ViewData["Title"] · Cod & Eat"/><meta property="og:description" content="@ViewData["Description"]"/><meta property="og:type" content="@(ViewData["Recipe"]!=null?"article":"website")"/>}else{<meta name="robots" content="noindex,nofollow"/>}
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/><script src="~/js/site.js" defer asp-append-version="true"></script></head>
+<body><a class="skip" href="#main">Aller au contenu</a>
+<header>
+<a class="brand" href="/"><span class="brand-mark" aria-hidden="true">c.</span><span>Cod <em>&amp;</em> Eat<small>PLANIFIER · CUISINER</small></span></a>
+<p class="nav-heading">VOTRE ESPACE CUISINE</p>
+<nav aria-label="Navigation principale">
+@if(User.Identity?.IsAuthenticated==true){
+@foreach(var item in new[]{(Tab:"week",Label:"Ma semaine"),(Tab:"recipes",Label:"Recettes"),(Tab:"shopping",Label:"Courses"),(Tab:"batch",Label:"Batch cooking"),(Tab:"settings",Label:"Réglages")}){
+<a href="/?Tab=@item.Tab" aria-current="@(Context.Request.Path == "/" && activeTab == item.Tab ? "page" : null)"><svg aria-hidden="true"><use href="/icons.svg#@item.Tab"/></svg>@item.Label</a>
+}
+@if(User.IsInRole("Admin")){<a href="/Admin/Recipes"><svg aria-hidden="true"><use href="/icons.svg#admin"/></svg>Administration</a>}
+<form method="post" asp-page="/Account/Logout"><button class="quiet">Déconnexion</button></form>
+}else{<a href="/catalogue">La collection Terre &amp; Mer</a><a href="/Account/Login">Connexion</a>}
+</nav>
+<div class="sidebar-note"><strong>Une semaine bien pensée.</strong>Des repas choisis, des courses utiles et du temps pour vous.</div>
+</header>
+<main id="main">@if(TempData["Message"] is string message){<p class="notice" role="status">@message</p>}@RenderBody()</main>
+<footer>Cod &amp; Eat · Le goût de s’organiser.</footer>
+@await RenderSectionAsync("Scripts",required:false)</body></html>
+

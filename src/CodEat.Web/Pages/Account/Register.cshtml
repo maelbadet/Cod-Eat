@@ -1,0 +1,4 @@
+﻿@page
+@model CodEat.Web.Pages.Account.RegisterModel
+@{ViewData["Title"]="Créer un compte";}
+<section class="auth panel"><h1>Créer un compte</h1><form method="post" class="stack"><div asp-validation-summary="All"></div><input asp-for="Invite" type="hidden"/><label asp-for="Email">Adresse e-mail<input asp-for="Email" autocomplete="username"/></label><label asp-for="Password">Mot de passe (12 caractères minimum)<input asp-for="Password" autocomplete="new-password"/></label><p>Utilisez une majuscule, une minuscule, un chiffre et un symbole.</p><button>Créer mon compte</button></form></section>

@@ -1,0 +1,4 @@
+﻿@page
+@model CodEat.Web.Pages.Account.RecoveryModel
+@{ViewData["Title"]="Récupérer l’accès";}
+<section class="auth panel"><h1>Récupérer l’accès</h1><form method="post" class="stack"><div asp-validation-summary="All"></div><input asp-for="Token" type="hidden"/><input asp-for="UserId" type="hidden"/>@if(Model.Token!=null){<label>Nouveau mot de passe<input asp-for="Password" type="password" autocomplete="new-password" required/></label>}else{<label>Adresse e-mail<input asp-for="Email" type="email" required/></label><label>Action<select asp-for="Mode"><option value="reset">Réinitialiser le mot de passe</option><option value="resend">Renvoyer la confirmation d’adresse</option></select></label>}<button>Valider</button></form></section>

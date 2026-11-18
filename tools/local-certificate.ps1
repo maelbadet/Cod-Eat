@@ -1,0 +1,12 @@
+﻿param([string]$OutputPath = '.qa/local.pfx')
+$rsa = [System.Security.Cryptography.RSA]::Create(2048)
+$request = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new('CN=localhost', $rsa, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+$san = [System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder]::new()
+$san.AddDnsName('localhost')
+$san.AddIpAddress([System.Net.IPAddress]::Loopback)
+$request.CertificateExtensions.Add($san.Build())
+$certificate = $request.CreateSelfSigned([DateTimeOffset]::UtcNow.AddDays(-1),[DateTimeOffset]::UtcNow.AddDays(7))
+[System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($OutputPath))) | Out-Null
+[System.IO.File]::WriteAllBytes([System.IO.Path]::GetFullPath($OutputPath),$certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx))
+$certificate.Dispose()
+$rsa.Dispose()

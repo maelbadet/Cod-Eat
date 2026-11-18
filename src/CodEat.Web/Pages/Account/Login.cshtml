@@ -1,0 +1,4 @@
+﻿@page
+@model CodEat.Web.Pages.Account.LoginModel
+@{ViewData["Title"]="Connexion";}
+<section class="auth panel"><p class="eyebrow">BIENVENUE À LA MAISON</p><h1>Connexion</h1><p>Retrouvez votre semaine, à deux.</p><form method="post" class="stack"><div asp-validation-summary="All"></div><label asp-for="Email">Adresse e-mail<input asp-for="Email" autocomplete="username"/></label><label asp-for="Password">Mot de passe<input asp-for="Password" autocomplete="current-password"/></label><button>Se connecter</button></form><p><a asp-page="Recovery">Mot de passe oublié ou confirmation d’adresse</a></p><a asp-page="Register">Créer un compte si les inscriptions sont ouvertes</a></section>

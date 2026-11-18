@@ -1,0 +1,53 @@
+﻿services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: codeat
+      POSTGRES_USER: codeat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U codeat -d codeat']
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+  app:
+    build: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Database: Host=db;Database=codeat;Username=codeat;Password=${POSTGRES_PASSWORD}
+      DataProtection__Path: /keys
+      AllowedHosts: ${PUBLIC_HOST:?Set PUBLIC_HOST}
+      Public__Origin: https://${PUBLIC_HOST}
+      Proxy__KnownNetworks__0: ${PROXY_NETWORK_CIDR:?Set PROXY_NETWORK_CIDR}
+      BookStack__BaseUrl: ${BOOKSTACK_URL:-}
+      BookStack__BookId: ${BOOKSTACK_BOOK_ID:-0}
+      BookStack__TokenId: ${BOOKSTACK_TOKEN_ID:-}
+      BookStack__TokenSecret: ${BOOKSTACK_TOKEN_SECRET:-}
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__From: ${SMTP_FROM:-}
+      Smtp__User: ${SMTP_USER:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__Tls: ${SMTP_TLS:-true}
+    volumes: [keys:/keys]
+    networks: [internal, proxy]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: [mail]
+    ports: ['127.0.0.1:8025:8025','127.0.0.1:1025:1025']
+    networks: [internal]
+networks:
+  internal: {internal: true}
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK_NAME:?Set PROXY_NETWORK_NAME}
+volumes:
+  postgres:
+  keys:

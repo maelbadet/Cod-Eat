@@ -55,3 +55,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+node_modules/
+.qa/
+*.db
+*.db-shm
+*.db-wal
+.keys/
+*.pfx
+
