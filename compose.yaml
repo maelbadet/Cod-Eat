@@ -18,7 +18,8 @@
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Database: Host=db;Database=codeat;Username=codeat;Password=${POSTGRES_PASSWORD}
+      # PostgreSQL local au réseau Docker, authentification par mot de passe sans Kerberos.
+      ConnectionStrings__Database: Host=db;Database=codeat;Username=codeat;Password=${POSTGRES_PASSWORD};GSS Encryption Mode=Disable
       DataProtection__Path: /keys
       AllowedHosts: ${PUBLIC_HOST:?Set PUBLIC_HOST}
       Public__Origin: https://${PUBLIC_HOST}

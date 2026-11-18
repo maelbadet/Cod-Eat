@@ -30,6 +30,7 @@ if (args.Contains("--migrate") || args.Contains("--bootstrap") || args.Contains(
  using var scope = app.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDb>();
  if (sqlite) await db.Database.EnsureCreatedAsync(); else await db.Database.MigrateAsync();
  if (!await db.Settings.AnyAsync()) { db.Settings.Add(new()); await db.SaveChangesAsync(); }
+ Console.WriteLine("Base de données prête : initialisation et migrations terminées.");
  if (args.Contains("--bootstrap")) await Setup.Bootstrap(scope.ServiceProvider, builder.Configuration);
  if (args.Contains("--seed-demo")) await Setup.Demo(scope.ServiceProvider); return;
 }

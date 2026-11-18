@@ -100,6 +100,14 @@ docker compose start app
 
 ## SMTP, confirmation et récupération
 
+### Diagnostic du premier démarrage PostgreSQL
+
+Npgsql 10 peut afficher `Cannot load library libgssapi_krb5.so.2` lorsqu’il tente une négociation GSSAPI sans Kerberos installé. Compose utilise explicitement `GSS Encryption Mode=Disable` pour notre PostgreSQL interne authentifié par mot de passe ; ce paramètre est distinct du réglage TLS. Référence : https://www.npgsql.org/doc/release-notes/10.0.html.
+
+Sur une base neuve, un message `Failed executing DbCommand` pour la lecture de `__EFMigrationsHistory` peut précéder la création de cette table et la réussite des migrations. Le fragment seul ne prouve pas un échec : vérifier la suite du journal, le code de sortie de la commande et le message `Base de données prête : initialisation et migrations terminées.`. Les autres erreurs SQL ne doivent pas être ignorées.
+
+Après mise à jour du code/configuration, exécuter `docker compose build app`, puis `docker compose run --rm app --migrate`. En cas d’échec, relever les dernières lignes de la sortie, notamment l’exception et le code SQLSTATE, sans partager les secrets. Ne pas supprimer le volume pour résoudre ce diagnostic.
+
 Renseigner `Smtp__Host`, `Port`, `From`, `User`, `Password`, `Tls`. Les liens utilisent `Public__Origin` (HTTPS). Les jetons de confirmation et de réinitialisation sont fournis par Identity. Pour tester localement avec Mailpit :
 
 ```powershell
