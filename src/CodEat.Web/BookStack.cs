@@ -10,9 +10,15 @@ namespace CodEat.Web;
 public record ImportedPage(int Id, string Name, string Text);
 public class BookStackClient(HttpClient http, IConfiguration config)
 {
-    public async Task<List<ImportedPage>> Read(CancellationToken ct)
+    public async Task<List<ImportedPage>> Read(CancellationToken ct, Action<BookStackProgress>? progress = null)
     {
-        if (config.GetValue<bool>("BookStack:Simulated")) return [new(9001, "Cabillaud citron et pommes de terre", "Cuire les pommes de terre. Ajouter le cabillaud et le citron, puis cuire au four. Source BookStack simulée.")];
+        progress?.Invoke(new(0, 0, "Vérification de la connexion et du livre"));
+        if (config.GetValue<bool>("BookStack:Simulated"))
+        {
+            ct.ThrowIfCancellationRequested();
+            progress?.Invoke(new(1, 1, "Lecture des fiches de démonstration"));
+            return [new(9001, "Cabillaud citron et pommes de terre", "Cuire les pommes de terre. Ajouter le cabillaud et le citron, puis cuire au four. Source BookStack simulée.")];
+        }
         var baseUrl = config["BookStack:BaseUrl"]?.Trim();
         if (string.IsNullOrWhiteSpace(baseUrl) || !Uri.TryCreate(baseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var uri)
             || uri.Scheme != "https" || uri.UserInfo != "" || uri.Query != "" || uri.Fragment != "")
@@ -42,6 +48,7 @@ public class BookStackClient(HttpClient http, IConfiguration config)
             using var json = await GetJson($"api/pages?count=100&offset={offset}&sort=%2Bid&filter[book_id]={book}", ct);
             var entries = json.RootElement.GetProperty("data").EnumerateArray().ToArray();
             var total = json.RootElement.GetProperty("total").GetInt32();
+            progress?.Invoke(new(result.Count, total, "Lecture des fiches BookStack"));
             foreach (var item in entries)
             {
                 var id = item.GetProperty("id").GetInt32();
@@ -49,6 +56,7 @@ public class BookStackClient(HttpClient http, IConfiguration config)
                 if (page.RootElement.GetProperty("book_id").GetInt32() != book) throw new BookStackFailure("BS_CHANGED", "Le livre a changé pendant la synchronisation. Réessayez pour obtenir un catalogue cohérent.");
                 var text = page.RootElement.TryGetProperty("markdown", out var md) && !string.IsNullOrWhiteSpace(md.GetString()) ? md.GetString()! : WebUtility.HtmlDecode(Regex.Replace(page.RootElement.GetProperty("html").GetString() ?? "", "<[^>]*>", " ", RegexOptions.None, TimeSpan.FromSeconds(1)));
                 result.Add(new(id, page.RootElement.GetProperty("name").GetString()!, text));
+                progress?.Invoke(new(result.Count, total, "Lecture des fiches BookStack"));
             }
             offset += entries.Length;
             if (offset >= total) break;
@@ -72,10 +80,12 @@ public class BookStackClient(HttpClient http, IConfiguration config)
 }
 public class BookStackSync(AppDb db, BookStackClient client)
 {
-    public async Task<string> Run(CancellationToken ct)
+    public async Task<string> Run(CancellationToken ct, Action<BookStackProgress>? progress = null)
     {
         // All external requests complete before any catalogue change is persisted.
-        var pages = await client.Read(ct);
+        var pages = await client.Read(ct, progress);
+        ct.ThrowIfCancellationRequested();
+        progress?.Invoke(new(pages.Count, pages.Count, "Enregistrement du catalogue"));
         var recipes = await db.Recipes.Where(x => x.BookStackId != null).ToListAsync(ct);
         int created = 0, updated = 0, same = 0;
         foreach (var p in pages)

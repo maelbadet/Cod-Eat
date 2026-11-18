@@ -151,3 +151,7 @@ Valeurs réelles à fournir : **URL BookStack HTTPS, ID du livre, Token ID et To
 ### Contrôler la connexion BookStack
 
 Sur le VPS, après mise à jour du code : `docker compose build app`, puis `docker compose run --rm app --check-bookstack`. Ce contrôle est en lecture seule et n’affiche pas les jetons ni l’URL interne. La synchronisation dans Administration affiche également un code d’erreur précis. Voir les codes et les vérifications dans [docs/bookstack-modele.md](docs/bookstack-modele.md).
+
+### Synchronisation BookStack sans attente du proxy
+
+La synchronisation s’exécute maintenant en tâche de fond, avec compteur de fiches et bilan visibles dans Administration. Fermer la page ne l’arrête pas. Le suivi et la file sont en mémoire dans l’unique conteneur applicatif ; après un redémarrage du conteneur, relancer un import interrompu. Le catalogue reste persistant et les imports restent atomiques. Voir [les limites et le diagnostic des 504](docs/bookstack-modele.md).

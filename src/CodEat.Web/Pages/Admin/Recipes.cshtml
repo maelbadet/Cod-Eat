@@ -2,7 +2,19 @@
 @model CodEat.Web.Pages.Admin.RecipesModel
 @{ViewData["Title"]="Administration des recettes";}
 <h1>Administration des recettes</h1><div asp-validation-summary="All" role="alert"></div><a href="/Admin/Recipes">Nouvelle fiche / recharger</a>
-<section class="panel"><h2>BookStack</h2><p>Le titre et les étapes importés sont gérés dans BookStack. Les enrichissements locaux sont conservés.</p><form method="post" asp-page-handler="Sync"><button>Synchroniser BookStack</button></form></section>
+<section class="panel"><h2>BookStack</h2><p>Le titre et les étapes importés sont gérés dans BookStack. Les enrichissements locaux sont conservés.</p>
+@{var sync = Model.SyncStatus;}
+<div class="sync-panel" data-bookstack-sync data-status-url="@Url.Page("/Admin/Recipes", "SyncStatus")" data-state="@sync.State">
+<form method="post" asp-page-handler="Sync"><button data-sync-start disabled="@sync.IsBusy">Synchroniser BookStack</button></form>
+<p class="muted">L’import continue en arrière-plan, même si vous quittez cette page.</p>
+<div class="sync-status @(sync.State == "Failed" ? "sync-error" : "")" data-sync-status role="status" aria-live="polite">
+<p data-sync-message>@sync.Message</p>
+<p class="muted" data-sync-stage>@sync.Stage @(sync.IsBusy && sync.Total > 0 ? $" · {sync.Completed} / {sync.Total} fiches lues" : "")</p>
+<progress data-sync-progress max="@Math.Max(1,sync.Total)" value="@sync.Completed" hidden="@(!sync.IsBusy || sync.Total <= 0)" aria-label="Avancement de la synchronisation"></progress>
+</div>
+<a asp-page="Recipes" data-sync-refresh hidden="@(sync.State != "Succeeded")">Actualiser le catalogue importé</a>
+<noscript><p><a asp-page="Recipes">Actualiser le suivi de la synchronisation</a></p></noscript>
+</div></section>
 <div class="cards"><section class="panel"><h2>Catalogue</h2>@foreach(var r in Model.Recipes){<p><a asp-route-id="@r.Id">@r.Title</a> · @r.Status @(r.Missing?" · absente du livre":"")</p>}</section><section class="panel"><h2>Ouverture au public</h2><form method="post" asp-page-handler="Settings" class="stack"><label class="check"><input name="catalog" type="checkbox" value="true" checked="@Model.Settings.PublicCatalog"/>Catalogue public</label><label class="check"><input name="registration" type="checkbox" value="true" checked="@Model.Settings.PublicRegistration"/>Inscriptions publiques (SMTP requis)</label><button>Enregistrer l’ouverture</button></form></section></div>
 <form method="post" class="panel stack"><h2>Fiche recette</h2><input asp-for="Input.Id" type="hidden"/><input asp-for="Input.Revision" type="hidden"/>
 <label>Titre<input asp-for="Input.Title" required/></label><label>Description<textarea asp-for="Input.Description"></textarea></label><label>Étapes<textarea asp-for="Input.Steps"></textarea></label><label>Collection<input asp-for="Input.Collection"/></label><label>Catégorie<select asp-for="Input.Category"><option>Terre</option><option>Mer</option><option>Terre & Mer</option></select></label><label>Tags<input asp-for="Input.Tags"/></label><label>Portions de référence<input asp-for="Input.Servings" value="@Model.Input.Servings.ToString(System.Globalization.CultureInfo.InvariantCulture)" type="number" min="0.5" step="0.5"/></label><label>Ingrédients (une ligne par produit)<textarea asp-for="IngredientsText" rows="8"></textarea></label><p>Format : nom canonique|quantité|unité|rayon|commentaire. Quantité vide pour « selon le goût ». Exemple : cabillaud|600|g|Poissonnerie|sans peau</p>

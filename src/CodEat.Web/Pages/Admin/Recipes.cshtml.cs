@@ -4,22 +4,34 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 namespace CodEat.Web.Pages.Admin;
-public class RecipesModel(AppDb db,BookStackSync sync,ILogger<RecipesModel> logger) : PageModel {
+public class RecipesModel(AppDb db,BookStackSyncQueue syncQueue) : PageModel {
  public List<Recipe> Recipes {get;set;}=[];
  [BindProperty] public Recipe Input {get;set;}=new();
  [BindProperty] public string IngredientsText {get;set;}="";
  public AppSettings Settings {get;set;}=new();
- public async Task OnGetAsync(int? id){Recipes=await db.Recipes.OrderBy(x=>x.Title).ToListAsync();Settings=await db.Settings.SingleAsync();if(id.HasValue){Input=Recipes.Single(x=>x.Id==id);IngredientsText=string.Join('\n',Input.Ingredients.Select(x=>$"{x.Canonical}|{x.Quantity?.ToString(CultureInfo.InvariantCulture)}|{x.Unit}|{x.Aisle}|{x.Comment}"));}}
- public async Task<IActionResult> OnPostSyncAsync()
+ public BookStackSyncStatus SyncStatus => syncQueue.Snapshot;
+ public async Task OnGetAsync(int? id)
  {
-     try { TempData["Message"] = await sync.Run(HttpContext.RequestAborted); }
-     catch (Exception failure)
+     Recipes = await db.Recipes.AsNoTracking().OrderBy(x => x.Title)
+         .Select(x => new Recipe { Id = x.Id, Title = x.Title, Status = x.Status, Missing = x.Missing }).ToListAsync();
+     Settings = await db.Settings.SingleAsync();
+     if (id.HasValue)
      {
-         var diagnostic = BookStackDiagnostic.From(failure);
-         logger.LogWarning("Synchronisation BookStack échouée [{DiagnosticCode}], type {FailureType}.", diagnostic.Code, failure.GetType().Name);
-         TempData["Message"] = $"Synchronisation échouée [{diagnostic.Code}]. {diagnostic.Guidance} Catalogue précédent conservé.";
+         Input = await db.Recipes.SingleAsync(x => x.Id == id);
+         IngredientsText = string.Join('\n', Input.Ingredients.Select(x => $"{x.Canonical}|{x.Quantity?.ToString(CultureInfo.InvariantCulture)}|{x.Unit}|{x.Aisle}|{x.Comment}"));
      }
+ }
+ public IActionResult OnPostSync()
+ {
+     TempData["Message"] = syncQueue.TryEnqueue()
+         ? "Synchronisation lancée en arrière-plan. Vous pouvez suivre son avancement ci-dessous."
+         : "Une synchronisation est déjà en cours. Son avancement est affiché ci-dessous.";
      return RedirectToPage();
+ }
+ public IActionResult OnGetSyncStatus()
+ {
+     Response.Headers.CacheControl = "no-store, private";
+     return new JsonResult(syncQueue.Snapshot);
  }
  public async Task<IActionResult> OnPostSettingsAsync(bool catalog,bool registration){if(registration&&string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Smtp:Host"])){TempData["Message"]="Configurez SMTP avant d’ouvrir les inscriptions.";return RedirectToPage();}var settings=await db.Settings.SingleAsync();settings.PublicCatalog=catalog;settings.PublicRegistration=registration;await db.SaveChangesAsync();return RedirectToPage();}
  public async Task<IActionResult> OnPostAliasAsync(string alias,string canonical){if(string.IsNullOrWhiteSpace(alias)||string.IsNullOrWhiteSpace(canonical))return BadRequest();alias=Kitchen.Normalize(alias);canonical=Kitchen.Normalize(canonical);var existing=await db.Aliases.SingleOrDefaultAsync(x=>x.Alias==alias);if(existing==null)db.Aliases.Add(new(){Alias=alias,Canonical=canonical});else existing.Canonical=canonical;await db.SaveChangesAsync();TempData["Message"]="Alias enregistré. Régénérez les courses en enregistrant votre semaine.";return RedirectToPage();}
@@ -42,6 +54,8 @@ public class RecipesModel(AppDb db,BookStackSync sync,ILogger<RecipesModel> logg
  Recipes=await db.Recipes.ToListAsync();Settings=await db.Settings.SingleAsync();return Page();
  }
 }
+
+
 
 
 

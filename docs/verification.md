@@ -60,3 +60,13 @@ Contrôles de cette refonte : 21 tests xUnit, dont listes PDF longues avec véri
 Reproduction des aperçus (après `dotnet build` et `npm ci`) : `node tools/preview-design.mjs`. Le script crée une base isolée sous `.qa`, génère un mot de passe aléatoire en mémoire et arrête le serveur à la fin. Définir CHROME_PATH pour un Chromium existant, ou installer le navigateur correspondant avec `npx playwright install chromium`.
 
 Aperçus actualisés : `qa/charte-semaine-1440.png`, `qa/charte-semaine-390.png`, `qa/studio-shopping.png`, `qa/studio-recipes.png`, `qa/studio-batch.png`, `qa/studio-settings.png`, `qa/charte-courses.pdf`, `qa/charte-repas.pdf`.
+
+## Correction des délais de synchronisation BookStack
+
+La synchronisation est exécutée par un service de fond avec scope EF Core propre. Le POST de démarrage n’attend plus l’API BookStack et le suivi JSON, réservé aux administrateurs et non mis en cache, expose l’état, la phase et le nombre de fiches lues. Un verrou dans la file refuse les lancements simultanés dans le conteneur applicatif. Fermer le navigateur ne fournit plus le jeton d’annulation de la tâche.
+
+Tests ajoutés : API volontairement bloquée alors que le POST répond déjà, annulation de la requête de lancement sans annuler l’import, clic concurrent refusé, succès final et progression ; accès anonyme/membre refusé au suivi ; échec HTTP 504 de l’API après lecture de la liste sans import partiel et possibilité de relancer avec succès.
+
+Vérification Chromium locale avec API simulée : lancement, suivi JavaScript/JSON, affichage du bilan, réactivation du bouton et rechargement explicite du catalogue ; écrans d’administration contrôlés à 390 et 1440 px. Captures `qa/bookstack-sync-390.png` et `qa/bookstack-sync-1440.png`. Le reverse proxy du VPS et l’instance réelle restent à vérifier sur place.
+
+Limite documentée : file et suivi en mémoire, adaptés au conteneur unique de Compose. Un arrêt du conteneur impose de relancer explicitement une tâche interrompue. Aucun changement de schéma ni migration supplémentaire pour cette correction.

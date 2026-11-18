@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using CodEat.Web;
 using Microsoft.EntityFrameworkCore;
@@ -141,9 +141,13 @@ public class BookStackClientTests
         var response = await client.PostAsync("/Admin/Recipes?handler=Sync", new FormUrlEncodedContent(new Dictionary<string, string>
         { ["__RequestVerificationToken"] = AppFactory.Token(page) }));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        for (var attempt = 0; attempt < 100 && app.Services.GetRequiredService<BookStackSyncQueue>().Snapshot.State != "Failed"; attempt++)
+            await Task.Delay(20);
+        Assert.Equal("Failed", app.Services.GetRequiredService<BookStackSyncQueue>().Snapshot.State);
         var result = await client.GetStringAsync("/Admin/Recipes");
         Assert.Contains("BS_HTTP_401", result);
         Assert.DoesNotContain("private-bookstack.test", result);
         Assert.DoesNotContain("fake-secret", result);
     }
 }
+

@@ -22,6 +22,8 @@ builder.Services.AddRateLimiter(o => { o.RejectionStatusCode = 429; o.AddPolicy(
 builder.Services.Configure<ForwardedHeadersOptions>(o => { o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto; o.KnownIPNetworks.Clear(); o.KnownProxies.Clear(); foreach (var ip in builder.Configuration.GetSection("Proxy:KnownProxies").Get<string[]>() ?? []) o.KnownProxies.Add(IPAddress.Parse(ip)); foreach (var network in builder.Configuration.GetSection("Proxy:KnownNetworks").Get<string[]>() ?? []) o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network)); });
 builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".keys"))).SetApplicationName("CodEat");
 builder.Services.AddScoped<HouseholdService>(); builder.Services.AddScoped<BookStackSync>(); builder.Services.AddScoped<MailService>(); builder.Services.AddSingleton<PdfExport>();
+builder.Services.AddSingleton<BookStackSyncQueue>();
+builder.Services.AddHostedService<BookStackSyncWorker>();
 builder.Services.AddHttpClient<BookStackClient>(c => c.Timeout = TimeSpan.FromSeconds(30)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 GlobalFontSettings.FontResolver = new LocalFontResolver();
 var app = builder.Build();

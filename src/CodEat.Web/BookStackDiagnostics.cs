@@ -31,6 +31,7 @@ public record BookStackDiagnostic(string Code, string Guidance)
         404 => "Ressource BookStack introuvable (HTTP 404). Vérifiez BOOKSTACK_URL et l’identifiant numérique BOOKSTACK_BOOK_ID ; un livre sans droit de lecture peut aussi être masqué.",
         >= 300 and < 400 => $"L’API BookStack renvoie une redirection (HTTP {status}). Utilisez son URL HTTPS finale dans BOOKSTACK_URL et vérifiez les règles du reverse proxy.",
         429 => "La limite de requêtes de l’API BookStack a été atteinte (HTTP 429). Attendez avant de réessayer.",
+        504 => "Le proxy devant BookStack a dépassé son délai sur une requête API (HTTP 504). Vérifiez les ressources de BookStack, sa base de données et les journaux de son proxy.",
         >= 500 => $"BookStack ou son reverse proxy est indisponible (HTTP {status}). Vérifiez les journaux de ces services.",
         _ => $"L’API BookStack refuse la requête (HTTP {status}). Vérifiez sa configuration et sa disponibilité."
     });

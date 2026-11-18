@@ -58,3 +58,20 @@ docker compose up -d --force-recreate app
 ```
 
 Un simple `docker compose restart app` ne recharge pas les variables d’environnement du conteneur. Ne pas publier le résultat complet de `docker compose config`, qui peut contenir les secrets ; partager uniquement le code de diagnostic assaini.
+
+## Synchronisation en arrière-plan et erreurs 504
+
+Le bouton d’administration démarre désormais une tâche de fond et répond immédiatement par une redirection. Le navigateur consulte ensuite un endpoint de suivi réservé aux administrateurs toutes les deux secondes. L’import ne dépend plus de la durée d’une requête du navigateur ni de sa déconnexion. Le formulaire d’édition n’est pas rechargé automatiquement : un lien permet d’actualiser le catalogue après réussite sans perdre silencieusement une saisie en cours.
+
+Une seule synchronisation peut être active dans le conteneur applicatif. Le service ouvre son propre scope EF Core et conserve la limite de 30 secondes par appel HTTP, avec une durée totale maximale de 30 minutes. Les appels restent séquentiels pour ne pas multiplier la charge sur l’API. Tous les appels externes aboutissent avant l’écriture atomique du catalogue : une panne ne laisse pas d’import partiel.
+
+Le suivi est en mémoire et prévu pour l’unique conteneur `app` du Compose fourni. Fermer le navigateur ne l’interrompt pas ; redémarrer le conteneur l’interrompt et réinitialise le suivi. Dans ce cas, relancer explicitement l’import après redémarrage. Le catalogue persistant contient soit la version précédente, soit un import entièrement validé par la transaction. Ne pas déployer plusieurs instances applicatives avec cette file en mémoire sans ajouter un verrou et une file distribués.
+
+Mise à jour sur le VPS (aucune migration de base supplémentaire pour ce changement) :
+
+```sh
+docker compose build app
+docker compose up -d --force-recreate app
+```
+
+Une erreur 504 affichée directement par le navigateur peut provenir du proxy devant Cod & Eat lorsque l’ancienne synchronisation gardait la requête ouverte trop longtemps. Avec cette version, si le suivi affiche plutôt `[BS_HTTP_504]`, c’est une réponse 504 reçue depuis l’API BookStack ou son proxy : examiner alors les journaux et ressources de BookStack, de sa base et de son proxy. Si le navigateur reçoit encore une 504 dès le clic, vérifier que la nouvelle image a bien été reconstruite et déployée, puis les journaux de l’application et de Nginx Proxy Manager.
