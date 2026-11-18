@@ -9,6 +9,34 @@ namespace CodEat.Tests;
 
 public class RecipeBrowserTests
 {
+    [Theory]
+    [InlineData("2026-12-01")]
+    [InlineData("2027-01-12")]
+    public async Task SelectedMealDateKeepsDayAndMonthFromFrenchForm(string selectedDate)
+    {
+        await using var app=new AppFactory();await app.Initialize();
+        int recipeId;Guid household;
+        using(var scope=app.Services.CreateScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDb>();
+            recipeId=await db.Recipes.Where(x=>x.Category=="Mer").Select(x=>x.Id).SingleAsync();
+            household=await db.Users.Where(x=>x.Email=="member@example.test").Select(x=>x.HouseholdId).SingleAsync();
+        }
+        using var client=app.Client();await AppFactory.Login(client,"member@example.test");
+        var html=await client.GetStringAsync($"/recettes/{recipeId}?Date={selectedDate}");
+        var dateInput=Regex.Match(html,"<input[^>]+id=\"Date\"[^>]*>").Value;
+        Assert.Contains($"value=\"{selectedDate}\"",dateInput);
+        var form=new Dictionary<string,string>{["__RequestVerificationToken"]=AppFactory.Token(html),["Id"]=recipeId.ToString(),
+            ["Date"]=selectedDate,["Slot"]="Midi",["People"]="2"};
+        var result=await client.PostAsync($"/recettes/{recipeId}?Date=2026-01-12",new FormUrlEncodedContent(form));
+        Assert.Equal(HttpStatusCode.Redirect,result.StatusCode);
+        Assert.Contains(selectedDate,result.Headers.Location!.ToString());
+        using var verify=app.Services.CreateScope();var dbVerify=verify.ServiceProvider.GetRequiredService<AppDb>();
+        var date=DateOnly.ParseExact(selectedDate,"yyyy-MM-dd");
+        var week=await dbVerify.Weeks.SingleAsync(x=>x.HouseholdId==household && x.Monday==Kitchen.Monday(date));
+        Assert.Equal(date.DayNumber-week.Monday.DayNumber,week.Data.Meals.Single().Day);
+    }
+
     [Fact]
     public async Task SearchFacetsPagingAndDedicatedRecipeKeepStepsOutOfCards()
     {
@@ -65,12 +93,15 @@ public class RecipeBrowserTests
             var data=(await db.Weeks.SingleAsync(x=>x.HouseholdId==household && x.Monday==Kitchen.Monday(date))).Data;
             Assert.Equal(leftovers?6:3,data.Preparations.Single().Portions);
             Assert.Equal(leftovers && !sunday?2:1,data.Meals.Count);
+            Assert.Equal("Soir",data.Meals.Single(x=>x.Day==date.DayNumber-Kitchen.Monday(date).DayNumber).Slot);
+            if(leftovers && !sunday)Assert.Equal("Midi",data.Meals.Single(x=>x.Day==date.AddDays(1).DayNumber-Kitchen.Monday(date).DayNumber).Slot);
             Assert.Equal(leftovers?900:450,data.Shopping.Single(x=>x.Name=="cabillaud").Calculated);
             Assert.False(await db.Weeks.AnyAsync(x=>x.HouseholdId!=household && x.Monday==Kitchen.Monday(date)));
             if(leftovers && sunday)
             {
                 var next=(await db.Weeks.SingleAsync(x=>x.HouseholdId==household && x.Monday==Kitchen.Monday(date.AddDays(1)))).Data;
                 Assert.Single(next.Meals);Assert.Equal(3,next.Meals.Single().Portions);Assert.True(next.Preparations.Single().Carryover);
+                Assert.Equal("Midi",next.Meals.Single().Slot);
                 Assert.Empty(next.Shopping);Assert.Equal(data.Preparations.Single().Id,next.Preparations.Single().Id);
                 Assert.Throws<InvalidOperationException>(()=>Kitchen.Assign(next,new(1,"Soir",next.Preparations.Single().Id,1)));
                 // Removing Sunday's served meal must not remove the shopping for Monday's reserved food.

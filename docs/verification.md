@@ -112,3 +112,33 @@ Test d’intégration supplémentaire : 26 fiches publiées, fiches inconnues/no
 
 
 Validation finale : 76 tests réussis en Release, compilation sans avertissement ni erreur.
+
+## Recettes complètes dans le planning, le batch et les PDF — 18 novembre 2026
+
+- Ajout d’une page de préparation dédiée, autorisée uniquement pour le foyer propriétaire de la semaine. Elle utilise l’instantané enregistré, sans dépendre du statut ou du contenu actuel du catalogue. Liens explicites depuis les titres des repas et les lots de batch cooking.
+- Ingrédients proportionnés aux portions du lot, quantités inconnues conservées comme telles, préparation complète et repères de conservation. Le texte source des étapes est préservé, avec mention des portions de référence si nécessaire.
+- PDF des repas enrichi avec ingrédients, étapes, allergènes, énergie, ustensiles et conservation. Les recettes longues continuent sur plusieurs pages avec rappel du titre. Les exports existants restent immuables.
+- Tests supplémentaires : instantané conservé après modification du catalogue, liens planning/batch, accès anonyme et autre foyer refusés, quantité ajustée de 600 à 900 g, quantité inconnue, recette de plus de 50 étapes intégralement exportée et limites physiques des pages vérifiées avec PdfPig.
+- Chromium : liens et contenu complet vérifiés à 390 et 1440 px, sans débordement ; PDF généré via la finalisation réelle. Artifacts `recette-planifiee-{390,1440}.png` et `repas-recettes-completes.pdf`. Aucun déploiement distant.
+
+Validation finale : 79 tests réussis en Release, compilation sans avertissement ni erreur.
+
+### Curseur de calories — 18 novembre 2026
+
+Curseur horizontal à deux poignées sur le catalogue, valeurs min/max visibles et labels accessibles. Échelle issue des données disponibles, paramètres URL conservés et bornes absentes préservées. Vérification Chromium à 320, 390, 768 et 1440 px : déplacement souris, flèches/Home/End au clavier, impossibilité de croiser les poignées, recherche et pagination existantes. Compilation sans avertissement ni erreur ; syntaxe JavaScript vérifiée. Aucun changement de schéma de base.
+
+### Emplacements photo optionnels — 18 novembre 2026
+
+Partiel partagé pour les cartes et les fiches privées, publiques et planifiées. Résolution par identifiant stable vers un fichier local ; aucun cadre rendu lorsqu’il n’existe pas d’image. Ratio 8:5, object-fit cover, texte alternatif, chargement lazy, URL versionnée et suppression du cadre en cas d’erreur de chargement. Aucun accès distant ni migration.
+
+Build sans avertissement ni erreur. Chromium : absence de figure et de lien photo visible sans fichier ; apparition avec un PNG temporaire ; contrôle du chargement sur carte, fiche et préparation, ratio et absence de débordement à 390/1440 px, masquage après erreur et disparition après retrait du fichier. Le fichier temporaire a été supprimé.
+
+### Sélection directe de la semaine — 19 novembre 2026
+
+Dates centrales remplacées par un contrôle déroulant accessible avec champ date natif, ouverture du calendrier quand showPicker est pris en charge, sélection automatique de la semaine côté serveur et raccourci semaine courante. Les flèches restent présentes. Repli utilisable sans JavaScript avec bouton Afficher, fermeture Échap/clic extérieur.
+
+Build sans avertissement/erreur et syntaxe JavaScript vérifiée. Chromium à 320, 390, 768 et 1440 px : ouverture, choix du 15 février 2028 donnant la semaine du 14 au 20, conservation du filtre kcal, flèches semaine suivante/précédente et navigation sans JS vers juin 2029. Aucun débordement. Captures `selecteur-semaine-390.png` et `selecteur-semaine-1440.png`. Aucun changement de base ni déploiement distant.
+
+### Restes réservés pour le déjeuner — 19 novembre 2026
+
+Les restes créés depuis une fiche recette sont désormais affectés au **midi du lendemain**, quel que soit le créneau du premier repas. Le contrôle des créneaux occupés porte sur ce déjeuner. Les portions doublées et le passage dimanche soir/lundi midi conservent les mêmes calculs de courses et réservations. Libellés et confirmation mis à jour. Les trois cas existants de planification (sans restes, avec restes, changement de semaine) passent avec assertions sur les créneaux. Cette évolution concerne les nouveaux ajouts ; les repas déjà enregistrés ne sont pas déplacés automatiquement.

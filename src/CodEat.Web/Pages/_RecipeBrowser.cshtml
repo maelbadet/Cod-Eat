@@ -8,8 +8,17 @@
 <div class="recipe-filter-grid">
 <label>Type de plat<select asp-for="Category"><option value="">Toutes les catégories</option><option>Terre</option><option>Mer</option><option>Terre & Mer</option></select></label>
 <label>Viande, poisson ou autre<select asp-for="Protein"><option value="">Toutes les protéines</option>@foreach(var item in Model.ProteinOptions){<option value="@item.Key">@item.Key (@item.Value)</option>}</select></label>
-<label>Calories minimum<input asp-for="MinKcal" type="number" min="0" placeholder="Sans minimum"/></label>
-<label>Calories maximum<input asp-for="MaxKcal" type="number" min="0" placeholder="Sans maximum"/></label>
+<fieldset class="calorie-filter" data-calorie-filter>
+<legend>Calories par personne</legend>
+<div class="calorie-values"><output data-calorie-min>@(Model.MinKcal.HasValue?$"{Model.MinKcal} kcal":"Sans minimum")</output><span aria-hidden="true">—</span><output data-calorie-max>@(Model.MaxKcal.HasValue?$"{Model.MaxKcal} kcal":"Sans maximum")</output></div>
+<input asp-for="MinKcal" type="hidden" disabled data-calorie-value-min/><input asp-for="MaxKcal" type="hidden" disabled data-calorie-value-max/>
+<div class="calorie-slider" hidden>
+<div class="calorie-track"><div data-calorie-fill></div></div>
+<label class="sr-only" for="calorie-min">Calories minimum</label><input id="calorie-min" type="range" min="0" max="@Model.CalorieCeiling" step="1" value="@Math.Clamp(Model.MinKcal??0,0,Model.CalorieCeiling)" data-calorie-handle-min/>
+<label class="sr-only" for="calorie-max">Calories maximum</label><input id="calorie-max" type="range" min="0" max="@Model.CalorieCeiling" step="1" value="@Math.Clamp(Model.MaxKcal??Model.CalorieCeiling,0,Model.CalorieCeiling)" data-calorie-handle-max/>
+</div>
+<noscript><div class="fields"><label>Minimum (kcal)<input name="MinKcal" type="number" min="0" value="@Model.MinKcal"/></label><label>Maximum (kcal)<input name="MaxKcal" type="number" min="0" value="@Model.MaxKcal"/></label></div></noscript>
+</fieldset>
 <label>Temps total<select asp-for="MaxTotal"><option value="">Sans limite</option><option value="20">20 min maximum</option><option value="30">30 min maximum</option><option value="45">45 min maximum</option><option value="60">1 h maximum</option></select></label>
 <label>Trier par<select asp-for="Sort"><option value="popular">Les plus ajoutés cette semaine</option><option value="title">Nom du plat</option><option value="quick">Les plus rapides</option><option value="kcal">Calories croissantes</option></select></label>
 </div>

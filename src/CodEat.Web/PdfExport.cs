@@ -44,6 +44,9 @@ public partial class PdfExport
             foreach (var p in session)
             {
                 lines.Add($"{p.Recipe.Title} : {p.Portions:0.##} portions ; actif {p.Recipe.ActiveMinutes?.ToString() ?? "?"} min ; cuisson {p.Recipe.CookMinutes?.ToString() ?? "?"} min");
+                lines.Add("Ingrédients pour le lot :");
+                lines.AddRange(RecipeQuantities.For(p.Recipe,p.Portions).Select(x=>$"{x.Canonical} : {RecipeQuantities.Quantity(x)} · {x.Comment}"));
+                lines.Add("Préparation complète :");lines.Add(RecipeQuantities.ScalingNote(p.Recipe,p.Portions));lines.Add(p.Recipe.Steps);
                 lines.Add($"Conservation : {(p.Frozen ? "congelé " + p.Recipe.FreezerDays + " jours" : "réfrigérateur " + p.Recipe.FridgeHours + " heures")}");
                 lines.Add($"Décongélation : {p.Recipe.Thaw} ; Réchauffage : {p.Recipe.Reheat}");
                 lines.AddRange(Kitchen.Warnings(p, data, monday).Select(x => "ATTENTION : " + x));

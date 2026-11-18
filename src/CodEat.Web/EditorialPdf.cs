@@ -80,13 +80,30 @@ public partial class PdfExport
                 var recipe = preparation.Recipe;
                 report.RecipeHeading(recipe.Title, preparation.Carryover?"Restes de la semaine précédente":$"{preparation.Portions:0.##} portions à cuisiner");
                 report.Paragraph($"Préparation active : {Minutes(recipe.ActiveMinutes)}   /   Cuisson : {Minutes(recipe.CookMinutes)}   /   Total : {Minutes(recipe.TotalMinutes)}", muted: true);
+                report.Paragraph($"Catégorie : {recipe.Category} · Collection : {recipe.Collection}",muted:true);
+                if(recipe.Kcal.HasValue)report.Paragraph($"Énergie : {recipe.Kcal} kcal par portion · {recipe.KcalSource}",muted:true);
                 var meals = data.Meals.Where(x => x.PreparationId == preparation.Id)
                     .Select(x => $"{monday.AddDays(x.Day):ddd dd/MM} {x.Slot.ToLowerInvariant()} · {x.Portions:0.##} portions");
                 report.Paragraph("Repas associés — " + string.Join(" ; ", meals));
+                if(!string.IsNullOrWhiteSpace(recipe.Description)) report.Paragraph(recipe.Description,muted:true);
+                report.Label("INGRÉDIENTS",$"Quantités pour {preparation.Portions:0.##} portions dans ce lot.");
+                var ingredients=RecipeQuantities.For(recipe,preparation.Portions);
+                if(ingredients.Count==0) report.Paragraph("Ingrédients non renseignés dans cette version du planning.",muted:true);
+                foreach(var ingredient in ingredients) report.Paragraph($"• {ingredient.Canonical} — {RecipeQuantities.Quantity(ingredient)}"+(string.IsNullOrWhiteSpace(ingredient.Comment)?"":" · "+ingredient.Comment));
+                report.Label("ALLERGÈNES",recipe.AllergensVerified?(string.IsNullOrWhiteSpace(recipe.Allergens)?"Aucun identifié dans les ingrédients déclarés.":recipe.Allergens):"Non vérifiés : vérifiez les ingrédients et les étiquettes.");
+                if(!string.IsNullOrWhiteSpace(recipe.Equipment))report.Label("USTENSILES",recipe.Equipment);
+                // Older snapshots without a complete recipe must remain readable.
+                if(!string.IsNullOrWhiteSpace(recipe.Steps))
+                {
+                    report.Label("PRÉPARATION COMPLÈTE",RecipeQuantities.ScalingNote(recipe,preparation.Portions));
+                    foreach(var step in recipe.Steps.Replace("\r\n","\n").Split('\n',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)) report.Paragraph(step);
+                }
+                else if(ingredients.Count>0) report.Label("PRÉPARATION COMPLÈTE","Étapes non renseignées dans cette version du planning.");
                 report.Label("CONSERVATION", preparation.Frozen
                     ? $"Congélation : {(recipe.FreezerDays.HasValue ? recipe.FreezerDays + " jours" : "durée à renseigner")}."
                     : $"Réfrigérateur : {(recipe.FridgeHours.HasValue ? recipe.FridgeHours + " heures" : "Conservation à renseigner")}.");
-                if (preparation.Frozen) report.Label("DÉCONGÉLATION", string.IsNullOrWhiteSpace(recipe.Thaw) ? "Consignes à renseigner." : recipe.Thaw);
+                if(recipe.Freezable && !preparation.Frozen)report.Paragraph($"Congélation possible : {(recipe.FreezerDays.HasValue?recipe.FreezerDays+" jours":"durée à renseigner")}.",muted:true);
+                if (preparation.Frozen || !string.IsNullOrWhiteSpace(recipe.Thaw)) report.Label("DÉCONGÉLATION", string.IsNullOrWhiteSpace(recipe.Thaw) ? "Consignes à renseigner." : recipe.Thaw);
                 report.Label("AVANT DE SERVIR", string.IsNullOrWhiteSpace(recipe.Reheat) ? "Réchauffage à renseigner." : recipe.Reheat);
                 foreach (var warning in Kitchen.Warnings(preparation, data, monday)) report.Warning(warning);
                 report.Gap(14);
@@ -154,8 +171,9 @@ internal sealed class EditorialReport : IDisposable
         else
         {
             graphics.DrawString(title + " · suite", bold, ink, new XPoint(Left, 79));
-            if (currentSection != "") graphics.DrawString(currentSection, small, red, new XPoint(Left, 96));
-            y = 118;
+            var contextLines=Wrap(currentSection,small,Width).Take(2).ToArray();
+            for(var i=0;i<contextLines.Length;i++)graphics.DrawString(contextLines[i],small,red,new XPoint(Left,96+i*11));
+            y = 118+Math.Max(0,contextLines.Length-1)*11;
         }
     }
 
@@ -259,6 +277,7 @@ internal sealed class EditorialReport : IDisposable
 
     public void RecipeHeading(string name, string portions)
     {
+        currentSection=name;
         var lines = Wrap(name, heading, Width);
         Ensure(lines.Length * 18 + 110);
         Gap(12);

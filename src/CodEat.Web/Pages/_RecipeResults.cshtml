@@ -3,6 +3,7 @@
 <div class="recipe-grid">
 @foreach(var recipe in Model.Recipes){
 <article class="recipe-card">
+<a class="recipe-photo-link" asp-page="/Recipes/Details" asp-route-id="@recipe.Id" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")" asp-route-ReturnUrl="@Url.Page("/Index",Model.CatalogRoutes(Model.CatalogPage))"><partial name="Shared/_RecipePhoto" model="recipe"/></a>
 <div class="recipe-card-top"><span class="recipe-category" data-category="@recipe.Category">@recipe.Category</span>@if(!recipe.AllergensVerified){<span class="recipe-unverified">À vérifier</span>}</div>
 <h3><a asp-page="/Recipes/Details" asp-route-id="@recipe.Id" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")" asp-route-ReturnUrl="@Url.Page("/Index",Model.CatalogRoutes(Model.CatalogPage))">@recipe.Title</a></h3>
 <p class="recipe-description">@(string.IsNullOrWhiteSpace(recipe.Description)?"Les ingrédients, les étapes et les portions sur la fiche recette.":recipe.Description)</p>

@@ -208,6 +208,27 @@ L’onglet Recettes propose une barre de recherche actualisée sans rechargement
 
 Affichage initial de 12 cartes, choix de 24 ou 48 par page ; tri par fréquence dans la semaine du foyer, nom, durée ou kcal. Les calories inconnues sont exclues lorsqu’une borne est active. Les fiches complètes sont accessibles sur `/recettes/{id}`, avec retour aux filtres du catalogue et accès réservé aux membres connectés.
 
-Depuis la fiche, choisir la date, Midi/Soir et le nombre de personnes (1–20), puis Ajouter à ma semaine. L’option Restes double les portions à cuisiner et ajoute le même nombre de portions au même créneau le lendemain. Les créneaux occupés ne sont pas écrasés. Les courses comptent le lot une seule fois. Du dimanche au lundi, les courses restent dans la semaine de cuisson ; les portions de chaque semaine sont réservées et ne peuvent pas être réaffectées ailleurs. La date et le volume de ces lots partagés sont conservés pour éviter de désynchroniser les deux semaines.
+Depuis la fiche, choisir la date, Midi/Soir et le nombre de personnes (1–20), puis Ajouter à ma semaine. L’option Restes double les portions à cuisiner et ajoute le même nombre de portions au midi du lendemain. Les créneaux occupés ne sont pas écrasés. Les courses comptent le lot une seule fois. Du dimanche au lundi, les courses restent dans la semaine de cuisson ; les portions de chaque semaine sont réservées et ne peuvent pas être réaffectées ailleurs. La date et le volume de ces lots partagés sont conservés pour éviter de désynchroniser les deux semaines.
 
 Ces données supplémentaires sont enregistrées dans les instantanés JSON existants : aucune nouvelle migration de base n’est nécessaire pour cette évolution. Déployer le code puis reconstruire et recréer le service app.
+
+### Recettes complètes depuis le planning, le batch cooking et les PDF
+
+Le titre de chaque repas et le lien « Voir la recette complète » ouvrent une fiche dédiée sur `/preparations/{weekId}/{preparationId}`. Le batch cooking propose le même accès. La fiche reprend l’instantané du planning du foyer : elle reste lisible si la recette du catalogue change ou repasse en brouillon. Elle présente les repas associés, les ingrédients ajustés au volume du lot, toutes les étapes, les allergènes, les durées, les ustensiles et la conservation.
+
+Le PDF des repas conserve la vue hebdomadaire et ajoute les ingrédients et les étapes complètes pour chaque préparation, avec continuation sur plusieurs pages si nécessaire. Les quantités d’ingrédients sont adaptées au lot ; le texte des étapes est conservé tel quel et une note signale les quantités de référence lorsque les portions changent. Une quantité inconnue reste à préciser. Le PDF des courses conserve sa fonction de liste de courses.
+
+Les versions PDF déjà finalisées sont immuables. Après déploiement, finaliser une nouvelle version pour obtenir le document enrichi. Les anciens plannings ne disposant pas des ingrédients ou étapes complets indiquent les données manquantes ; replanifier la recette à partir du catalogue enrichi pour disposer d’un nouvel instantané complet. Aucune migration supplémentaire n’est nécessaire.
+
+### Curseur de calories
+
+Les deux champs kcal du catalogue sont remplacés par une barre horizontale à deux poignées, avec valeurs visibles, clavier natif et recherche automatique. L’échelle est calculée à partir des calories connues du catalogue et des bornes de l’URL, avec un minimum d’échelle de 1 200 kcal. Les extrémités signifient sans minimum/sans maximum : une recherche sans borne conserve les recettes aux calories inconnues. Les bornes ne peuvent pas se croiser. Sans JavaScript, deux champs numériques restent disponibles.
+
+### Photos optionnelles des recettes
+
+Les cartes et fiches privées/publiques, ainsi que les fiches des préparations planifiées, disposent d’un emplacement photo au ratio 8:5. Sans fichier local, aucun encadré ni espace vide n’est affiché. Ajouter les images dans `src/CodEat.Web/wwwroot/images/recipes/`, nommées avec l’identifiant de recette (`42.webp`, par exemple). Formats acceptés : webp, avif, jpg, jpeg, png. Les fichiers sont des assets publics livrés au déploiement ; voir le README du dossier. Les images sont chargées à la demande et leur version change avec le fichier. Une image devenue indisponible est masquée. Aucun schéma de base ni export PDF n’est modifié par cet emplacement photo.
+
+### Navigation directe entre les semaines
+
+Cliquer sur les dates au centre de la navigation ouvre un sélecteur de date. Choisir un jour affiche sa semaine du lundi au dimanche ; les mois et années sont accessibles via le calendrier natif du navigateur. Les flèches restent disponibles et le raccourci « Cette semaine » revient à la semaine courante à Paris. Le formulaire conserve l’onglet et les filtres. Sans JavaScript, ouvrir le sélecteur, choisir la date puis cliquer Afficher.
+

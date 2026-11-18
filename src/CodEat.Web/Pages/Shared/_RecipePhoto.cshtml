@@ -1,0 +1,11 @@
+@model CodEat.Web.Recipe
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@{
+    // Images are optional local assets. No frame or image request without a file.
+    var photo = Model.Id > 0 ? new[] { "webp", "avif", "jpg", "jpeg", "png" }
+        .Select(extension => $"/images/recipes/{Model.Id}.{extension}")
+        .FirstOrDefault(path => Environment.WebRootFileProvider.GetFileInfo(path).Exists) : null;
+}
+@if(photo != null){
+<figure class="recipe-photo"><img src="@photo" asp-append-version="true" alt="Photo de @Model.Title" width="800" height="500" loading="lazy" decoding="async" data-recipe-photo/></figure>
+}

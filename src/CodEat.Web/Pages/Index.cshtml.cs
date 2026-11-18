@@ -18,6 +18,7 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  public record PopularRecipe(int Id,string Title,int Count);
  public List<PopularRecipe> PopularRecipes {get;private set;}=[];
  public Dictionary<string,int> ProteinOptions {get;private set;}=[];
+ public int CalorieCeiling {get;private set;}=1200;
  [BindProperty(SupportsGet=true)] public int? MaxActive {get;set;}
  [BindProperty(SupportsGet=true)] public int? MaxTotal {get;set;}
  [BindProperty(SupportsGet=true)] public string? Include {get;set;}
@@ -60,6 +61,7 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  ActiveMinutes=x.ActiveMinutes,TotalMinutes=x.TotalMinutes,Allergens=x.Allergens,AllergensVerified=x.AllergensVerified,
  Equipment=x.Equipment,IngredientsJson=x.IngredientsJson}).ToListAsync();
  ReadyRecipeCount = availableRecipes.Count;
+ CalorieCeiling=(int)Math.Min(int.MaxValue,((Math.Max(1200L,Math.Max(availableRecipes.Max(x=>(long?)x.Kcal)??0,Math.Max((long)MinKcal.GetValueOrDefault(),MaxKcal.GetValueOrDefault())))+99)/100)*100);
  DraftRecipeCount = await db.Recipes.CountAsync(x=>x.Status=="Brouillon" && !x.AvailablePrivately);
  var proteins=availableRecipes.ToDictionary(x=>x.Id,RecipeDiscovery.ProteinKinds);
  ProteinOptions=proteins.Values.SelectMany(x=>x).GroupBy(x=>x).OrderBy(x=>x.Key).ToDictionary(x=>x.Key,x=>x.Count());

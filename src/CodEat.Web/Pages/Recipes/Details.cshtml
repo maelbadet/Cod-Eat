@@ -1,8 +1,9 @@
-@page "/recettes/{id:int}"
+﻿@page "/recettes/{id:int}"
 @model CodEat.Web.Pages.Recipes.DetailsModel
 <a href="@Model.BackUrl" class="recipe-back">← Retour aux recettes</a>
 <div asp-validation-summary="All" role="alert"></div>
 <div class="recipe-detail recipe-detail-heading">
+<partial name="Shared/_RecipePhoto" model="Model.Recipe"/>
 <p class="eyebrow">@Model.Recipe.Category · @Model.Recipe.Collection</p><h1>@Model.Recipe.Title</h1>
 <p class="muted">@Model.Recipe.Description</p>
 <div class="recipe-metrics detail-metrics"><span><strong>@(Model.Recipe.TotalMinutes?.ToString()??"—")</strong> min au total</span><span><strong>@(Model.Recipe.ActiveMinutes?.ToString()??"—")</strong> min actives</span><span><strong>@(Model.Recipe.Kcal?.ToString()??"—")</strong> kcal / personne</span></div>
@@ -20,9 +21,10 @@
 <label>Date du repas<input asp-for="Date" type="date" required/></label>
 <label>Créneau<select asp-for="Slot"><option>Midi</option><option>Soir</option></select></label>
 <label>Nombre de personnes<input asp-for="People" type="number" min="1" max="20" required/></label>
-<label class="check"><input asp-for="Leftovers"/>Prévoir des restes pour le lendemain</label>
+<label class="check"><input asp-for="Leftovers"/>Prévoir des restes pour demain midi</label>
 <p class="recipe-plan-summary" data-plan-summary>Pour @Model.People personnes : @(Model.People*(Model.Leftovers?2:1)) portions à cuisiner.</p>
-<p class="muted">Avec des restes : une portion par personne aujourd’hui et autant demain, au même créneau. Les deux repas sont ajoutés au planning. Les créneaux déjà occupés ne sont pas remplacés.</p>
+<p class="muted">Avec des restes : une portion par personne aujourd’hui et autant demain midi, pour le repas à emporter. Les deux repas sont ajoutés au planning. Les créneaux déjà occupés ne sont pas remplacés.</p>
 <button>Ajouter à ma semaine</button>
 </form></aside>
 </div>
+

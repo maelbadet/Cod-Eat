@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +40,7 @@ public class DetailsModel(AppDb db, UserManager<AppUser> users, HouseholdService
             var tomorrow=Leftovers ? await households.GetWeek(household,date.AddDays(1)) : week;
             var nextData=tomorrow.Id==week.Id?data:tomorrow.Data;
             var nextDay=date.AddDays(1).DayNumber-tomorrow.Monday.DayNumber;
-            if(data.Meals.Any(x=>x.Day==day && x.Slot==Slot) || Leftovers && nextData.Meals.Any(x=>x.Day==nextDay && x.Slot==Slot))
+            if(data.Meals.Any(x=>x.Day==day && x.Slot==Slot) || Leftovers && nextData.Meals.Any(x=>x.Day==nextDay && x.Slot=="Midi"))
                 throw new InvalidOperationException("Un repas occupe déjà l’un de ces créneaux. Choisissez une autre date ou libérez ce créneau dans le planning.");
             var preparation=new Preparation {Recipe=Recipe,Portions=People*(Leftovers?2:1),ReservedAfterWeek=tomorrow.Id!=week.Id?People:0,At=date.ToDateTime(new TimeOnly(Slot=="Midi"?10:18,0))};
             data.Preparations.Add(preparation);
@@ -48,13 +48,13 @@ public class DetailsModel(AppDb db, UserManager<AppUser> users, HouseholdService
             if(Leftovers)
             {
                 if(tomorrow.Id!=week.Id) nextData.Preparations.Add(new Preparation{Id=preparation.Id,Recipe=Recipe,Portions=preparation.Portions,AtUtc=preparation.AtUtc,Carryover=true,ReservedBeforeWeek=People});
-                Kitchen.Assign(nextData,new(nextDay,Slot,preparation.Id,People));
+                Kitchen.Assign(nextData,new(nextDay,"Midi",preparation.Id,People));
             }
             var aliases=await db.Aliases.ToDictionaryAsync(x=>x.Alias,x=>x.Canonical);
             Kitchen.Regenerate(data,aliases);week.Data=data;week.Revision=Guid.NewGuid();
             if(tomorrow.Id!=week.Id){Kitchen.Regenerate(nextData,aliases);tomorrow.Data=nextData;tomorrow.Revision=Guid.NewGuid();}
             await db.SaveChangesAsync();
-            TempData["Message"]=Leftovers?$"{Recipe.Title} : {People*2} portions à cuisiner pour {People} personnes, dont {People} portions réservées au lendemain.":$"{Recipe.Title} ajouté pour {People} personnes.";
+            TempData["Message"]=Leftovers?$"{Recipe.Title} : {People*2} portions à cuisiner pour {People} personnes, dont {People} portions réservées au midi du lendemain.":$"{Recipe.Title} ajouté pour {People} personnes.";
             return RedirectToPage("/Index",new{Tab="week",Date=date.ToString("yyyy-MM-dd")});
         }
         catch(DbUpdateConcurrencyException){db.ChangeTracker.Clear();Response.StatusCode=409;ModelState.AddModelError("","Le planning a changé. Réessayez après avoir vérifié les créneaux.");}
@@ -62,3 +62,4 @@ public class DetailsModel(AppDb db, UserManager<AppUser> users, HouseholdService
         return Page();
     }
 }
+

@@ -1,0 +1,23 @@
+﻿@page "/preparations/{weekId:int}/{preparationId:guid}"
+@model CodEat.Web.Pages.Preparations.DetailsModel
+@{var preparation=Model.Preparation;var recipe=preparation.Recipe;}
+<a class="recipe-back" asp-page="/Index" asp-route-Tab="@(Model.From=="batch"?"batch":"week")" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")">← Retour @(Model.From=="batch"?"au batch cooking":"au planning")</a>
+<article class="planned-recipe recipe-detail">
+<partial name="Shared/_RecipePhoto" model="recipe"/>
+<p class="eyebrow">RECETTE PLANIFIÉE · @recipe.Category</p><h1>@recipe.Title</h1>
+<p class="muted">@recipe.Description</p>
+<div class="recipe-metrics detail-metrics"><span><strong>@preparation.Portions.ToString("0.##")</strong> portions dans le lot</span><span><strong>@(recipe.ActiveMinutes?.ToString()??"—")</strong> min actives</span><span><strong>@(recipe.CookMinutes?.ToString()??"—")</strong> min de cuisson</span><span><strong>@(recipe.TotalMinutes?.ToString()??"—")</strong> min au total</span><span><strong>@(recipe.Kcal?.ToString()??"—")</strong> kcal / personne</span></div>
+<section class="panel planned-context"><h2>@(preparation.Carryover?"Restes déjà préparés":"Votre préparation")</h2><p>Préparé le @preparation.At.ToString("dddd dd/MM/yyyy à HH:mm") · Europe/Paris</p>
+<ul>@foreach(var meal in Model.Data.Meals.Where(x=>x.PreparationId==preparation.Id).OrderBy(x=>x.Day).ThenBy(x=>x.Slot)){<li>@Model.Week.Monday.AddDays(meal.Day).ToString("dddd dd/MM") · @meal.Slot · @meal.Portions.ToString("0.##") portions servies</li>}</ul>
+@if(preparation.ReservedAfterWeek>0){<p>@preparation.ReservedAfterWeek.ToString("0.##") portions réservées pour la semaine suivante.</p>}
+<p class="muted">Cette fiche reprend la recette enregistrée avec le planning, même si le catalogue a changé depuis.</p></section>
+<div class="planned-recipe-columns"><section class="panel"><h2>Ingrédients pour @preparation.Portions.ToString("0.##") portions</h2>
+<ul class="recipe-ingredients">@foreach(var ingredient in Model.Ingredients){<li><span>@ingredient.Canonical<small>@ingredient.Comment</small></span><strong>@RecipeQuantities.Quantity(ingredient)</strong></li>}</ul>
+@if(Model.Ingredients.Count==0){<p class="warning">Les ingrédients ne sont pas renseignés dans cette version du planning.</p>}
+<p class="muted">@(recipe.AllergensVerified?"Allergènes déclarés : "+(string.IsNullOrWhiteSpace(recipe.Allergens)?"aucun identifié":recipe.Allergens):"Allergènes non vérifiés : vérifiez les ingrédients et les étiquettes.")</p>
+<p>Ustensiles : @(string.IsNullOrWhiteSpace(recipe.Equipment)?"à renseigner":recipe.Equipment)</p></section>
+<section class="panel"><h2>Préparation complète</h2><p class="muted">@RecipeQuantities.ScalingNote(recipe,preparation.Portions)</p><div class="prewrap recipe-steps">@(string.IsNullOrWhiteSpace(recipe.Steps)?"Étapes non renseignées dans cette version du planning.":recipe.Steps)</div></section></div>
+<section class="panel"><h2>Conserver et servir</h2><p>Réfrigérateur : @(recipe.FridgeHours?.ToString()??"durée inconnue") @(recipe.FridgeHours.HasValue?"heures":""). Congélation : @(recipe.Freezable?"possible":"non validée").</p>@if(recipe.Kcal.HasValue){<p class="muted">Énergie : @recipe.KcalSource.</p>}@if(recipe.Freezable){<p>Durée de congélation : @(recipe.FreezerDays?.ToString()??"non renseignée") @(recipe.FreezerDays.HasValue?"jours":"").</p>}<p>@recipe.Thaw</p><p>@recipe.Reheat</p>
+@foreach(var warning in Kitchen.Warnings(preparation,Model.Data,Model.Week.Monday)){<p class="warning">@warning</p>}</section>
+</article>
+
