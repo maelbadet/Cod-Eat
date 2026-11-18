@@ -1,0 +1,28 @@
+@page "/recettes/{id:int}"
+@model CodEat.Web.Pages.Recipes.DetailsModel
+<a href="@Model.BackUrl" class="recipe-back">← Retour aux recettes</a>
+<div asp-validation-summary="All" role="alert"></div>
+<div class="recipe-detail recipe-detail-heading">
+<p class="eyebrow">@Model.Recipe.Category · @Model.Recipe.Collection</p><h1>@Model.Recipe.Title</h1>
+<p class="muted">@Model.Recipe.Description</p>
+<div class="recipe-metrics detail-metrics"><span><strong>@(Model.Recipe.TotalMinutes?.ToString()??"—")</strong> min au total</span><span><strong>@(Model.Recipe.ActiveMinutes?.ToString()??"—")</strong> min actives</span><span><strong>@(Model.Recipe.Kcal?.ToString()??"—")</strong> kcal / personne</span></div>
+@if(!Model.Recipe.AllergensVerified){<p class="warning">Allergènes non vérifiés : vérifiez les ingrédients et les étiquettes.</p>}else{<p class="muted">Allergènes déclarés : @(string.IsNullOrWhiteSpace(Model.Recipe.Allergens)?"aucun identifié":Model.Recipe.Allergens)</p>}
+</div>
+<div class="recipe-detail-layout">
+<article class="recipe-detail">
+<section class="panel"><h2>Ingrédients</h2><p class="muted">Quantités de référence pour @Model.Recipe.Servings portions. Les courses s’adaptent automatiquement au nombre de portions planifiées.</p><ul class="recipe-ingredients">@foreach(var ingredient in Model.Recipe.Ingredients){<li><span>@ingredient.Canonical<small>@ingredient.Comment</small></span><strong>@ingredient.Quantity @ingredient.Unit</strong></li>}</ul></section>
+<section class="panel"><h2>Préparation</h2><div class="prewrap recipe-steps">@Model.Recipe.Steps</div></section>
+<section class="panel"><h2>Conservation et réchauffage</h2><p>Réfrigérateur : @(Model.Recipe.FridgeHours?.ToString()??"durée non renseignée") @(Model.Recipe.FridgeHours.HasValue?"heures":"").</p><p>@Model.Recipe.Thaw @Model.Recipe.Reheat</p><p class="muted">Les avertissements de conservation sont affichés dans le planning de préparation selon les dates choisies.</p></section>
+</article>
+<aside class="panel recipe-plan"><p class="eyebrow">DANS VOTRE SEMAINE</p><h2>À quel moment ?</h2>
+<form method="post" class="stack" data-recipe-plan>
+<input asp-for="Id" type="hidden"/><input asp-for="ReturnUrl" type="hidden"/>
+<label>Date du repas<input asp-for="Date" type="date" required/></label>
+<label>Créneau<select asp-for="Slot"><option>Midi</option><option>Soir</option></select></label>
+<label>Nombre de personnes<input asp-for="People" type="number" min="1" max="20" required/></label>
+<label class="check"><input asp-for="Leftovers"/>Prévoir des restes pour le lendemain</label>
+<p class="recipe-plan-summary" data-plan-summary>Pour @Model.People personnes : @(Model.People*(Model.Leftovers?2:1)) portions à cuisiner.</p>
+<p class="muted">Avec des restes : une portion par personne aujourd’hui et autant demain, au même créneau. Les deux repas sont ajoutés au planning. Les créneaux déjà occupés ne sont pas remplacés.</p>
+<button>Ajouter à ma semaine</button>
+</form></aside>
+</div>

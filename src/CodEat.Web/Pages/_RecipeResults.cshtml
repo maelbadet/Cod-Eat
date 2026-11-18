@@ -1,0 +1,20 @@
+@model CodEat.Web.Pages.IndexModel
+<div class="recipe-results-heading"><h2>@Model.MatchingRecipeCount @(Model.MatchingRecipeCount==1?"recette":"recettes")</h2><span>Page @Model.CatalogPage sur @Model.CatalogPages</span></div>
+<div class="recipe-grid">
+@foreach(var recipe in Model.Recipes){
+<article class="recipe-card">
+<div class="recipe-card-top"><span class="recipe-category" data-category="@recipe.Category">@recipe.Category</span>@if(!recipe.AllergensVerified){<span class="recipe-unverified">À vérifier</span>}</div>
+<h3><a asp-page="/Recipes/Details" asp-route-id="@recipe.Id" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")" asp-route-ReturnUrl="@Url.Page("/Index",Model.CatalogRoutes(Model.CatalogPage))">@recipe.Title</a></h3>
+<p class="recipe-description">@(string.IsNullOrWhiteSpace(recipe.Description)?"Les ingrédients, les étapes et les portions sur la fiche recette.":recipe.Description)</p>
+<div class="recipe-metrics"><span><strong>@(recipe.TotalMinutes?.ToString()??"—")</strong> min</span><span><strong>@(recipe.Kcal?.ToString()??"—")</strong> kcal / pers.</span><span><strong>@recipe.Servings</strong> portions</span></div>
+@if(!recipe.AllergensVerified){<span class="sr-only">Allergènes non vérifiés</span>}
+<a class="recipe-open" asp-page="/Recipes/Details" asp-route-id="@recipe.Id" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")" asp-route-ReturnUrl="@Url.Page("/Index",Model.CatalogRoutes(Model.CatalogPage))">Voir la recette et planifier <span aria-hidden="true">↗</span></a>
+</article>
+}
+</div>
+@if(Model.Recipes.Count==0){<section class="panel empty-catalog"><h2>@(Model.ReadyRecipeCount==0 && Model.DraftRecipeCount>0?"Vos recettes attendent leur validation":"Aucun résultat pour ces filtres")</h2><p>@Model.EmptyRecipeMessage</p>@if(User.IsInRole("Admin") && Model.DraftRecipeCount>0){<a asp-page="/Admin/ReviewImports" asp-route-Mode="public">Examiner les imports</a><a asp-page="/Admin/Recipes" asp-route-StatusFilter="draft">Compléter et valider les fiches</a>}else{<a asp-page="Index" asp-route-Tab="recipes">Effacer les filtres</a>}</section>}
+<nav class="recipe-pagination" aria-label="Pages des recettes">
+@if(Model.CatalogPage>1){<a asp-page="Index" asp-all-route-data="@Model.CatalogRoutes(Model.CatalogPage-1)" data-recipe-page>← Précédente</a>}
+<span>@Model.CatalogPage / @Model.CatalogPages</span>
+@if(Model.CatalogPage<Model.CatalogPages){<a asp-page="Index" asp-all-route-data="@Model.CatalogRoutes(Model.CatalogPage+1)" data-recipe-page>Suivante →</a>}
+</nav>

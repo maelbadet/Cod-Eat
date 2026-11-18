@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
@@ -58,7 +58,7 @@ public class Week
     public WeekData Data { get => JsonSerializer.Deserialize<WeekData>(DataJson)!; set => DataJson = JsonSerializer.Serialize(value); }
 }
 public class WeekData { public List<Preparation> Preparations { get; set; } = []; public List<Meal> Meals { get; set; } = []; public List<ShoppingLine> Shopping { get; set; } = []; }
-public class Preparation { public Guid Id { get; set; } = Guid.NewGuid(); public Recipe Recipe { get; set; } = new(); public decimal Portions { get; set; } = 4; public DateTime AtUtc { get; set; } = DateTime.UtcNow; [System.Text.Json.Serialization.JsonIgnore] public DateTime At { get => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(AtUtc, DateTimeKind.Utc), Kitchen.Paris); set => AtUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), Kitchen.Paris); } public bool Frozen { get; set; } }
+public class Preparation { public Guid Id { get; set; } = Guid.NewGuid(); public Recipe Recipe { get; set; } = new(); public decimal Portions { get; set; } = 4; public DateTime AtUtc { get; set; } = DateTime.UtcNow; [System.Text.Json.Serialization.JsonIgnore] public DateTime At { get => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(AtUtc, DateTimeKind.Utc), Kitchen.Paris); set => AtUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), Kitchen.Paris); } public bool Frozen { get; set; } public bool Carryover { get; set; } public decimal ReservedBeforeWeek { get; set; } public decimal ReservedAfterWeek { get; set; } }
 public record Meal(int Day, string Slot, Guid PreparationId, decimal Portions);
 public class ShoppingLine { public string Key { get; set; } = Guid.NewGuid().ToString(); public string Name { get; set; } = ""; public string Aisle { get; set; } = "Divers"; public string Unit { get; set; } = ""; public decimal? Calculated { get; set; } public decimal? Adjusted { get; set; } public bool Checked { get; set; } public bool InStock { get; set; } public bool Manual { get; set; } public bool Changed { get; set; } public string Note { get; set; } = ""; }
 public class ExportVersion { public int Id { get; set; } public Guid HouseholdId { get; set; } public int WeekId { get; set; } public int Version { get; set; } public DateTime CreatedUtc { get; set; } = DateTime.UtcNow; public string Snapshot { get; set; } = ""; public byte[] ShoppingPdf { get; set; } = []; public byte[] MealsPdf { get; set; } = []; }
@@ -95,3 +95,5 @@ public class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<AppUser>
         b.Entity<AppUser>().HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+

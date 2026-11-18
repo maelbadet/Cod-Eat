@@ -1,5 +1,5 @@
 ﻿@using CodEat.Web
-@{ var activeTab = Context.Request.Query["Tab"].FirstOrDefault() ?? "week"; }
+@{ var activeTab = Context.Request.Path.StartsWithSegments("/recettes") ? "recipes" : Context.Request.Query["Tab"].FirstOrDefault() ?? "week"; }
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>@ViewData["Title"] · Cod &amp; Eat</title><meta name="description" content="@(ViewData["Description"]??"Planifiez vos repas, préparez vos courses et cuisinez votre semaine avec Cod & Eat.")"/>
 @if(ViewData["Canonical"] is string canonical){<link rel="canonical" href="@canonical"/><meta property="og:url" content="@canonical"/><meta property="og:title" content="@ViewData["Title"] · Cod & Eat"/><meta property="og:description" content="@ViewData["Description"]"/><meta property="og:type" content="@(ViewData["Recipe"]!=null?"article":"website")"/>}else{<meta name="robots" content="noindex,nofollow"/>}
@@ -22,4 +22,5 @@
 <main id="main">@if(TempData["Message"] is string message){<p class="notice" role="status">@message</p>}@RenderBody()</main>
 <footer>Cod &amp; Eat · Le goût de s’organiser.</footer>
 @await RenderSectionAsync("Scripts",required:false)</body></html>
+
 

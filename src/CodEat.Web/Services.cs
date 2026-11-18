@@ -18,14 +18,14 @@ public static class Kitchen
         if (meal.Day is < 0 or > 6 || meal.Slot is not ("Midi" or "Soir") || meal.Portions <= 0) throw new InvalidOperationException("Créneau ou portions invalides.");
         var prep = data.Preparations.Single(x => x.Id == meal.PreparationId);
         var used = data.Meals.Where(x => x.PreparationId == prep.Id && !(x.Day == meal.Day && x.Slot == meal.Slot)).Sum(x => x.Portions);
-        if (used + meal.Portions > prep.Portions) throw new InvalidOperationException("Le lot ne contient pas assez de portions. Augmentez les portions à cuisiner.");
+        if (used + meal.Portions + prep.ReservedBeforeWeek + prep.ReservedAfterWeek > prep.Portions) throw new InvalidOperationException("Le lot ne contient pas assez de portions disponibles. Certaines portions peuvent être réservées dans la semaine voisine.");
         data.Meals.RemoveAll(x => x.Day == meal.Day && x.Slot == meal.Slot);
         data.Meals.Add(meal);
     }
     public static void Regenerate(WeekData data, IReadOnlyDictionary<string, string>? aliases = null)
     {
         var generated = new Dictionary<string, ShoppingLine>();
-        foreach (var p in data.Preparations.Where(p => data.Meals.Any(m => m.PreparationId == p.Id)))
+        foreach (var p in data.Preparations.Where(p => !p.Carryover && (p.ReservedAfterWeek>0 || data.Meals.Any(m => m.PreparationId == p.Id))))
         foreach (var i in p.Recipe.Ingredients)
         {
             var canonical = Normalize(i.Canonical);
@@ -48,6 +48,7 @@ public static class Kitchen
     public static string[] Warnings(Preparation p, WeekData data, DateOnly monday)
     {
         var warnings = new List<string>();
+        if(p.Carryover) warnings.Add("Restes cuisinés la semaine précédente : ingrédients déjà comptés dans les courses de cette préparation. Vérifiez la conservation avant consommation.");
         if (!p.Recipe.AllergensVerified) warnings.Add("Allergènes non vérifiés pour cette recette : vérifiez les ingrédients et les étiquettes.");
         if (p.Frozen)
         {

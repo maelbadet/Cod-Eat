@@ -1,0 +1,25 @@
+﻿@model CodEat.Web.Pages.IndexModel
+<section class="recipe-search panel" aria-label="Rechercher des recettes">
+<div class="recipe-search-heading"><div><p class="eyebrow">À VOTRE GOÛT</p><h2>Qu’est-ce qu’on cuisine ?</h2><p>Un plat, une envie, quelques filtres.</p></div><span class="catalog-count">@Model.ReadyRecipeCount recettes disponibles</span></div>
+<form method="get" data-recipe-search>
+<input type="hidden" name="Tab" value="recipes"/><input type="hidden" name="Date" value="@Model.Week.Monday.ToString("yyyy-MM-dd")"/>
+<div class="recipe-searchbar"><label for="recipe-query" class="sr-only">Rechercher un plat</label><input id="recipe-query" name="Search" value="@Model.Search" type="search" placeholder="Poulet, poêlée provençale, curry…" autocomplete="off" list="weekly-recipes"/><button>Rechercher</button></div>
+<datalist id="weekly-recipes">@foreach(var item in Model.PopularRecipes){<option value="@item.Title">@item.Count repas cette semaine</option>}</datalist>
+<div class="recipe-filter-grid">
+<label>Type de plat<select asp-for="Category"><option value="">Toutes les catégories</option><option>Terre</option><option>Mer</option><option>Terre & Mer</option></select></label>
+<label>Viande, poisson ou autre<select asp-for="Protein"><option value="">Toutes les protéines</option>@foreach(var item in Model.ProteinOptions){<option value="@item.Key">@item.Key (@item.Value)</option>}</select></label>
+<label>Calories minimum<input asp-for="MinKcal" type="number" min="0" placeholder="Sans minimum"/></label>
+<label>Calories maximum<input asp-for="MaxKcal" type="number" min="0" placeholder="Sans maximum"/></label>
+<label>Temps total<select asp-for="MaxTotal"><option value="">Sans limite</option><option value="20">20 min maximum</option><option value="30">30 min maximum</option><option value="45">45 min maximum</option><option value="60">1 h maximum</option></select></label>
+<label>Trier par<select asp-for="Sort"><option value="popular">Les plus ajoutés cette semaine</option><option value="title">Nom du plat</option><option value="quick">Les plus rapides</option><option value="kcal">Calories croissantes</option></select></label>
+</div>
+<details class="recipe-advanced"><summary>Ingrédients, allergènes et appareils</summary><div class="fields">
+<label>Ingrédients à inclure<input asp-for="Include" placeholder="riz, courgette"/></label><label>Ingrédients à exclure<input asp-for="Exclude"/></label><label>Allergènes à exclure<input asp-for="Allergens"/></label><label>Temps actif maximum (min)<input asp-for="MaxActive" type="number" min="0"/></label><label class="check"><input asp-for="EquipmentFilter"/>Mes appareils uniquement</label>
+</div></details>
+<div class="recipe-filter-footer"><a asp-page="Index" asp-route-Tab="recipes" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")">Effacer les filtres</a><label>Recettes par page<select asp-for="PageSize"><option value="12">12</option><option value="24">24</option><option value="48">48</option></select></label></div>
+</form>
+</section>
+@if(Model.PopularRecipes.Count>0){<section class="weekly-favorites"><p class="eyebrow">LES PLUS AJOUTÉS À VOTRE SEMAINE</p><div class="favorite-list">@foreach(var item in Model.PopularRecipes){<a asp-page="/Recipes/Details" asp-route-id="@item.Id" asp-route-Date="@Model.Week.Monday.ToString("yyyy-MM-dd")" asp-route-ReturnUrl="@(Context.Request.Path+Context.Request.QueryString)"><span>@item.Title</span><small>@item.Count repas</small><span aria-hidden="true">↗</span></a>}</div></section>}
+<p class="sr-only" data-recipe-status role="status" aria-live="polite"></p>
+<div data-recipe-results><partial name="_RecipeResults" model="Model"/></div>
+

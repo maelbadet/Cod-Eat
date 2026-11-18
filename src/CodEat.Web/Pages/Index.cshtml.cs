@@ -11,6 +11,13 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  [BindProperty(SupportsGet=true)] public string? Search {get;set;}
  [BindProperty(SupportsGet=true)] public string? Category {get;set;}
  [BindProperty(SupportsGet=true)] public int? MaxKcal {get;set;}
+ [BindProperty(SupportsGet=true)] public int? MinKcal {get;set;}
+ [BindProperty(SupportsGet=true)] public string? Protein {get;set;}
+ [BindProperty(SupportsGet=true)] public int PageSize {get;set;}=12;
+ [BindProperty(SupportsGet=true)] public string Sort {get;set;}="popular";
+ public record PopularRecipe(int Id,string Title,int Count);
+ public List<PopularRecipe> PopularRecipes {get;private set;}=[];
+ public Dictionary<string,int> ProteinOptions {get;private set;}=[];
  [BindProperty(SupportsGet=true)] public int? MaxActive {get;set;}
  [BindProperty(SupportsGet=true)] public int? MaxTotal {get;set;}
  [BindProperty(SupportsGet=true)] public string? Include {get;set;}
@@ -24,10 +31,11 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  public int ReadyRecipeCount { get; private set; }
  [BindProperty(SupportsGet=true)] public int CatalogPage { get; set; } = 1;
  public int MatchingRecipeCount { get; private set; }
- public int CatalogPages => Math.Max(1,(MatchingRecipeCount+23)/24);
+ public int CatalogPages => Math.Max(1,(MatchingRecipeCount+PageSize-1)/PageSize);
  public Dictionary<string,string> CatalogRoutes(int page) => new() {
  ["Tab"]="recipes", ["CatalogPage"]=page.ToString(), ["Date"]=Week.Monday.ToString("yyyy-MM-dd"),
  ["Search"]=Search??"", ["Category"]=Category??"", ["MaxKcal"]=MaxKcal?.ToString()??"",
+ ["MinKcal"]=MinKcal?.ToString()??"", ["Protein"]=Protein??"", ["PageSize"]=PageSize.ToString(), ["Sort"]=Sort,
  ["MaxActive"]=MaxActive?.ToString()??"", ["MaxTotal"]=MaxTotal?.ToString()??"",
  ["Include"]=Include??"", ["Exclude"]=Exclude??"", ["Allergens"]=Allergens??"", ["EquipmentFilter"]=EquipmentFilter.ToString() };
  public string EmptyRecipeMessage => DraftRecipeCount > 0 && ReadyRecipeCount == 0
@@ -41,20 +49,34 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  public Household Household {get;set;} = new();
  public string CopyText {get;set;} = "";
  public async Task OnGetAsync() => await Load();
+ public async Task<IActionResult> OnGetRecipeResultsAsync() { Tab="recipes"; await Load(); return Partial("_RecipeResults",this); }
  async Task<Guid> HouseholdId() => (await users.GetUserAsync(User))!.HouseholdId;
  async Task Load() {
  var id = await HouseholdId(); Household = await db.Households.SingleAsync(x=>x.Id==id);
  Week=await households.GetWeek(id, Date ?? Kitchen.Today); Data=Week.Data;
+ PageSize=RecipeDiscovery.PageSize(PageSize);
  var availableRecipes = await db.Recipes.AsNoTracking().Where(RecipeAvailability.Available).OrderBy(x=>x.Category).ThenBy(x=>x.Title).ThenBy(x=>x.Id)
  .Select(x=>new Recipe {Id=x.Id,Title=x.Title,Category=x.Category,Servings=x.Servings,Kcal=x.Kcal,
  ActiveMinutes=x.ActiveMinutes,TotalMinutes=x.TotalMinutes,Allergens=x.Allergens,AllergensVerified=x.AllergensVerified,
  Equipment=x.Equipment,IngredientsJson=x.IngredientsJson}).ToListAsync();
  ReadyRecipeCount = availableRecipes.Count;
  DraftRecipeCount = await db.Recipes.CountAsync(x=>x.Status=="Brouillon" && !x.AvailablePrivately);
- var matching=availableRecipes.Where(new RecipeFilter(Search,Category,MaxKcal,MaxActive,MaxTotal,Include,Exclude,Allergens,EquipmentFilter?Household.Equipment:null).Matches).ToList();
+ var proteins=availableRecipes.ToDictionary(x=>x.Id,RecipeDiscovery.ProteinKinds);
+ ProteinOptions=proteins.Values.SelectMany(x=>x).GroupBy(x=>x).OrderBy(x=>x.Key).ToDictionary(x=>x.Key,x=>x.Count());
+ var popularity=Data.Meals.GroupBy(x=>Data.Preparations.Single(p=>p.Id==x.PreparationId).Recipe.Id).ToDictionary(x=>x.Key,x=>x.Count());
+ PopularRecipes=availableRecipes.Where(x=>popularity.ContainsKey(x.Id)).OrderByDescending(x=>popularity[x.Id]).ThenBy(x=>x.Title)
+ .Take(6).Select(x=>new PopularRecipe(x.Id,x.Title,popularity[x.Id])).ToList();
+ var matching=availableRecipes.Where(new RecipeFilter(Search,Category,MaxKcal,MaxActive,MaxTotal,Include,Exclude,Allergens,EquipmentFilter?Household.Equipment:null).Matches)
+ .Where(x=>(MinKcal==null || x.Kcal.HasValue && x.Kcal>=MinKcal) && (string.IsNullOrEmpty(Protein)||proteins[x.Id].Contains(Protein))).ToList();
+ matching=(Sort switch {
+ "title"=>matching.OrderBy(x=>x.Title).ThenBy(x=>x.Id),
+ "kcal"=>matching.OrderBy(x=>x.Kcal==null).ThenBy(x=>x.Kcal).ThenBy(x=>x.Title),
+ "quick"=>matching.OrderBy(x=>x.TotalMinutes==null).ThenBy(x=>x.TotalMinutes).ThenBy(x=>x.Title),
+ _=>matching.OrderByDescending(x=>popularity.GetValueOrDefault(x.Id)).ThenBy(x=>x.Title).ThenBy(x=>x.Id)
+ }).ToList();
  MatchingRecipeCount=matching.Count;
  CatalogPage=Math.Clamp(CatalogPage,1,CatalogPages);
- var selected=Tab=="recipes" ? matching.Skip((CatalogPage-1)*24).Take(24).ToList()
+ var selected=Tab=="recipes" ? matching.Skip((CatalogPage-1)*PageSize).Take(PageSize).ToList()
  : matching.GroupBy(x=>x.Category).SelectMany(g=>g.Select((r,i)=>new{Recipe=r,Rank=i})).OrderBy(x=>x.Rank).ThenBy(x=>x.Recipe.Category).Take(50).Select(x=>x.Recipe).ToList();
  var selectedIds=selected.Select(x=>x.Id).ToArray();
  var full=await db.Recipes.AsNoTracking().Where(x=>selectedIds.Contains(x.Id)).ToDictionaryAsync(x=>x.Id);
@@ -75,7 +97,7 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  Kitchen.Assign(Data,new(day,slot,preparationId,portions)); break;
  case "remove": Data.Meals.RemoveAll(x=>x.Day==day&&x.Slot==slot); break;
  case "move": var moved=Data.Meals.Single(x=>x.PreparationId==preparationId&&x.Day==int.Parse(key!)&&x.Slot==decision); Data.Meals.Remove(moved); Kitchen.Assign(Data,moved with{Day=day,Slot=slot}); break;
- case "prepare": var prep=Data.Preparations.Single(x=>x.Id==preparationId); if(prepared<=0||prepared<Data.Meals.Where(x=>x.PreparationId==prep.Id).Sum(x=>x.Portions))throw new InvalidOperationException("Le lot ne peut pas être inférieur aux portions affectées."); prep.Portions=prepared; prep.At=DateTime.SpecifyKind(at,DateTimeKind.Unspecified); prep.Frozen=frozen; break;
+ case "prepare": var prep=Data.Preparations.Single(x=>x.Id==preparationId); if(prep.Carryover || prep.ReservedAfterWeek>0)throw new InvalidOperationException("Ce lot réserve des portions entre deux semaines. Ses quantités et sa date de préparation sont conservées pour garder les restes cohérents."); if(prepared<=0||prepared<Data.Meals.Where(x=>x.PreparationId==prep.Id).Sum(x=>x.Portions)+prep.ReservedBeforeWeek+prep.ReservedAfterWeek)throw new InvalidOperationException("Le lot ne peut pas être inférieur aux portions affectées."); prep.Portions=prepared; prep.At=DateTime.SpecifyKind(at,DateTimeKind.Unspecified); prep.Frozen=frozen; break;
  case "suggest":
  if(Recipes.Count==0)throw new InvalidOperationException(EmptyRecipeMessage);
  var index=0; var varied=Recipes.GroupBy(r=>r.Category).SelectMany(g=>g.Select((r,i)=>new{Recipe=r,Rank=i})).OrderBy(x=>x.Rank).ThenBy(x=>x.Recipe.Category).Select(x=>x.Recipe).ToList(); for(var d=0;d<7;d++)foreach(var s in new[]{"Midi","Soir"}) {if(Data.Meals.Any(x=>x.Day==d&&x.Slot==s))continue; var r=varied[index++%varied.Count]; var p=new Preparation{Recipe=r,Portions=2,At=Week.Monday.AddDays(-1).ToDateTime(new TimeOnly(16,0))}; Data.Preparations.Add(p); Kitchen.Assign(Data,new(d,s,p.Id,2));} break;
@@ -97,12 +119,14 @@ public class IndexModel(AppDb db, UserManager<AppUser> users, HouseholdService h
  var token=Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)); db.Invitations.Add(new(){HouseholdId=Household.Id,TokenHash=Account.RegisterModel.Hash(token),ExpiresUtc=System.DateTime.UtcNow.AddDays(2)}); TempData["Invitation"]=$"{Seo.Origin(HttpContext.RequestServices.GetRequiredService<IConfiguration>())}/Account/Register?invite={token}"; break;
  default: return BadRequest();
  }
- Data.Preparations.RemoveAll(x=>!Data.Meals.Any(m=>m.PreparationId==x.Id)); Kitchen.Regenerate(Data,await db.Aliases.ToDictionaryAsync(x=>x.Alias,x=>x.Canonical)); await households.Save(Week,revision,Data);
+ Data.Preparations.RemoveAll(x=>x.ReservedAfterWeek==0 && !Data.Meals.Any(m=>m.PreparationId==x.Id)); Kitchen.Regenerate(Data,await db.Aliases.ToDictionaryAsync(x=>x.Alias,x=>x.Canonical)); await households.Save(Week,revision,Data);
  TempData["Message"]="Modifications enregistrées."; return RedirectToPage(new{Tab,Date=Week.Monday.ToString("yyyy-MM-dd")});
  } catch(DbUpdateException) {db.ChangeTracker.Clear(); ModelState.AddModelError("","Une autre modification a été enregistrée. Rechargez la page avant de réessayer.");Response.StatusCode=409;} catch(InvalidOperationException ex){ModelState.AddModelError("",ex.Message);} catch(ArgumentException){ModelState.AddModelError("","Date ou heure invalide dans le fuseau Europe/Paris.");} 
  return Page();
  }
 }
+
+
 
 
 

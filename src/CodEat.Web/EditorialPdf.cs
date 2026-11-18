@@ -64,7 +64,7 @@ public partial class PdfExport
         report.Paragraph("Un même lot peut alimenter plusieurs repas. Les courses comptent chaque préparation une seule fois.", muted: true);
         if (data.Preparations.Count == 0) return report.Finish();
         report.NewChapter("Votre session cuisine", "Les préparations, les ustensiles et les consignes de conservation.");
-        report.Stats((data.Preparations.Sum(x => x.Recipe.ActiveMinutes ?? 0).ToString(), "min actives cumulées*"),
+        report.Stats((data.Preparations.Where(x=>!x.Carryover).Sum(x => x.Recipe.ActiveMinutes ?? 0).ToString(), "min actives cumulées*"),
             (data.Preparations.Count.ToString(), data.Preparations.Count == 1 ? "lot à préparer" : "lots à préparer"),
             (data.Preparations.Select(x => x.At).Distinct().Count().ToString(), data.Preparations.Select(x => x.At).Distinct().Count() == 1 ? "session" : "sessions"));
         report.Paragraph("* Cumul des temps connus, distinct de la durée réelle de la session. Les temps manquants sont exclus.", muted: true);
@@ -78,7 +78,7 @@ public partial class PdfExport
             foreach (var preparation in session)
             {
                 var recipe = preparation.Recipe;
-                report.RecipeHeading(recipe.Title, $"{preparation.Portions:0.##} portions à cuisiner");
+                report.RecipeHeading(recipe.Title, preparation.Carryover?"Restes de la semaine précédente":$"{preparation.Portions:0.##} portions à cuisiner");
                 report.Paragraph($"Préparation active : {Minutes(recipe.ActiveMinutes)}   /   Cuisson : {Minutes(recipe.CookMinutes)}   /   Total : {Minutes(recipe.TotalMinutes)}", muted: true);
                 var meals = data.Meals.Where(x => x.PreparationId == preparation.Id)
                     .Select(x => $"{monday.AddDays(x.Day):ddd dd/MM} {x.Slot.ToLowerInvariant()} · {x.Portions:0.##} portions");

@@ -100,3 +100,15 @@ Extracteur version 2 : l’activation en lot exige une classification source `re
 Ajout du mode public à la revue en lot : les brouillons et recettes validées importés peuvent être publiés après confirmation, uniquement si la source est reconnue comme recette et les champs obligatoires/allergènes vérifiés. Statut Publiée et slug sont enregistrés atomiquement, sans modifier les données d’allergènes ni ouvrir automatiquement le catalogue. Le ticket signé inclut la destination ; un ticket privé ne peut autoriser la publication. Liste publique paginée à 24 fiches et recherche dans tout le catalogue publié.
 
 Test d’intégration supplémentaire : 26 fiches publiées, fiches inconnues/non vérifiées exclues, destination du ticket contrôlée, URL publique/JSON-LD/sitemap et pagination vérifiés. Chromium : aperçu, confirmation et accès public vérifiés à 390 et 1440 px ; captures `publication-imports-390.png` et `publication-imports-1440.png`. Build Release sans avertissement. Aucune publication distante effectuée.
+
+## Catalogue fluide et planification depuis une fiche — 18 novembre 2026
+
+- Recherche visible avec grille actualisée après 300 ms, annulation des requêtes périmées et maintien du focus. Filtres préchargés, protéines déterminées depuis les ingrédients, kcal min/max, durées, tri, options avancées ; fonctionnement conservé sans JavaScript.
+- Suggestions et tri par nombre de repas de la semaine sélectionnée, limités au foyer connecté. Pagination 12/24/48, fiches détaillées sur une page distincte, URL de retour locale validée.
+- Affectation à une date et un créneau, 1 à 20 personnes ; restes = double quantité préparée et repas réservé le lendemain. Pas d’écrasement des créneaux occupés, protection antiforgery, isolation des foyers et concurrence EF.
+- Passage dimanche/lundi : lot préparé compté une seule fois dans les courses, report de restes sans rachat, réservations empêchant une double affectation. La préparation partagée conserve sa date et son volume. Supprimer le repas du dimanche ne supprime pas les courses nécessaires aux restes réservés du lundi.
+- Vérification Chromium à 320, 390, 768 et 1440 px sans débordement : recherche sans perte de focus, filtres, 48 cartes, pagination, page détaillée, ajout de trois personnes avec six portions et deux repas. Captures `catalogue-recettes-{390,1440}.png` et `fiche-recette-{390,1440}.png`.
+- Modèle EF inchangé : compléments des préparations dans le JSON existant, aucune nouvelle migration. Tests et exécution locale SQLite ; aucun déploiement distant ni validation PostgreSQL en fonctionnement.
+
+
+Validation finale : 76 tests réussis en Release, compilation sans avertissement ni erreur.

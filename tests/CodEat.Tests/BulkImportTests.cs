@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.RegularExpressions;
 using CodEat.Web;
 using Microsoft.EntityFrameworkCore;
@@ -58,15 +58,15 @@ public class BulkImportTests
             Assert.False((await db.Recipes.SingleAsync(x=>x.BookStackId==13001)).AvailablePrivately);
         }
         var catalog=WebUtility.HtmlDecode(await member.GetStringAsync("/?Tab=recipes"));
-        Assert.Equal(24,Regex.Matches(catalog,"<article class=\"panel\">").Count);
+        Assert.Equal(12,Regex.Matches(catalog,"<article class=\"recipe-card\">").Count);
         Assert.Contains("Allergènes non vérifiés",catalog);
         Assert.Contains("Suivante",catalog);
-        var last=WebUtility.HtmlDecode(await member.GetStringAsync("/?Tab=recipes&CatalogPage=109"));
+        var last=WebUtility.HtmlDecode(await member.GetStringAsync("/?Tab=recipes&CatalogPage=217"));
         Assert.Contains("Import 2600",last);
         var week=await member.GetStringAsync("/");
         Assert.True(Regex.Matches(week,"<option value=\"\\d+\">Import").Count<=14*50);
         var filtered=WebUtility.HtmlDecode(await member.GetStringAsync("/?Tab=recipes&Search=Import&Allergens=lait"));
-        Assert.DoesNotContain("<article class=\"panel\">",filtered);
+        Assert.DoesNotContain("<article class=\"recipe-card\">",filtered);
         using var anonymous=app.Client();
         Assert.DoesNotContain("Import 0001",await anonymous.GetStringAsync("/catalogue"));
         using(var scope=app.Services.CreateScope())
@@ -140,3 +140,4 @@ public class BulkImportTests
         using(var scope=app.Services.CreateScope()) Assert.Equal(0,await scope.ServiceProvider.GetRequiredService<AppDb>().Recipes.CountAsync(x=>x.AvailablePrivately));
     }
 }
+

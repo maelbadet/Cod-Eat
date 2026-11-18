@@ -201,3 +201,13 @@ Pour publier les imports, utiliser **Administration → Examiner et publier les 
 Préparer l’aperçu puis confirmer la publication publique. Un ticket de planning privé ne peut pas autoriser une publication. Les fiches publiées reçoivent leur statut et URL publique ; les anciens slugs restent redirigés. Le catalogue doit aussi être ouvert dans **Administration → Ouverture au public → Catalogue public**. Cette ouverture reste un réglage explicite distinct. La liste publique affiche 24 fiches par page et permet de rechercher dans tout le catalogue publié.
 
 Si toutes les fiches restent bloquées sur « allergènes vérifiés », leur import n’a pas remplacé cette revue : ouvrir et vérifier les fiches avant de préparer un nouveau lot public.
+
+### Recherche de recettes et ajout au planning
+
+L’onglet Recettes propose une barre de recherche actualisée sans rechargement complet, des suggestions fondées sur les repas du foyer dans la semaine affichée et des filtres préchargés (Terre/Mer, viandes/poissons/autres protéines réellement présentes dans les ingrédients, kcal minimum/maximum, durée, ingrédients, allergènes et appareils). Les exclusions d’allergènes continuent de rejeter les fiches non vérifiées. Sans JavaScript, le bouton Rechercher et la pagination restent fonctionnels.
+
+Affichage initial de 12 cartes, choix de 24 ou 48 par page ; tri par fréquence dans la semaine du foyer, nom, durée ou kcal. Les calories inconnues sont exclues lorsqu’une borne est active. Les fiches complètes sont accessibles sur `/recettes/{id}`, avec retour aux filtres du catalogue et accès réservé aux membres connectés.
+
+Depuis la fiche, choisir la date, Midi/Soir et le nombre de personnes (1–20), puis Ajouter à ma semaine. L’option Restes double les portions à cuisiner et ajoute le même nombre de portions au même créneau le lendemain. Les créneaux occupés ne sont pas écrasés. Les courses comptent le lot une seule fois. Du dimanche au lundi, les courses restent dans la semaine de cuisson ; les portions de chaque semaine sont réservées et ne peuvent pas être réaffectées ailleurs. La date et le volume de ces lots partagés sont conservés pour éviter de désynchroniser les deux semaines.
+
+Ces données supplémentaires sont enregistrées dans les instantanés JSON existants : aucune nouvelle migration de base n’est nécessaire pour cette évolution. Déployer le code puis reconstruire et recréer le service app.
