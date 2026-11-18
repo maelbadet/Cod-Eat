@@ -26,6 +26,22 @@ builder.Services.AddHttpClient<BookStackClient>(c => c.Timeout = TimeSpan.FromSe
 GlobalFontSettings.FontResolver = new LocalFontResolver();
 var app = builder.Build();
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("fr-FR"); CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+if (args.Contains("--check-bookstack"))
+{
+    using var checkScope = app.Services.CreateScope();
+    try
+    {
+        var pages = await checkScope.ServiceProvider.GetRequiredService<BookStackClient>().Read(CancellationToken.None);
+        Console.WriteLine($"BookStack accessible : {pages.Count} page(s) lisible(s). Diagnostic en lecture seule, aucun catalogue modifié.");
+    }
+    catch (Exception failure)
+    {
+        var diagnostic = BookStackDiagnostic.From(failure);
+        Console.Error.WriteLine($"[{diagnostic.Code}] {diagnostic.Guidance}");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 if (args.Contains("--migrate") || args.Contains("--bootstrap") || args.Contains("--seed-demo")) {
  using var scope = app.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDb>();
  if (sqlite) await db.Database.EnsureCreatedAsync(); else await db.Database.MigrateAsync();

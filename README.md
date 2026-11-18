@@ -147,3 +147,7 @@ Le script navigateur crée une base `.qa` isolée et deux comptes à mot de pass
 Valeurs réelles à fournir : **URL BookStack HTTPS, ID du livre, Token ID et Token Secret du compte technique, nom d’hôte public, nom/CIDR ou IP du réseau proxy approuvé, mot de passe PostgreSQL et paramètres SMTP**. Ne les déposer ni dans Git ni dans les rapports de tests.
 
 
+
+### Contrôler la connexion BookStack
+
+Sur le VPS, après mise à jour du code : `docker compose build app`, puis `docker compose run --rm app --check-bookstack`. Ce contrôle est en lecture seule et n’affiche pas les jetons ni l’URL interne. La synchronisation dans Administration affiche également un code d’erreur précis. Voir les codes et les vérifications dans [docs/bookstack-modele.md](docs/bookstack-modele.md).
